@@ -1,10 +1,17 @@
 import { createBrowserRouter } from "react-router";
 
-import App from "./app";
+import { NotFoundRoute } from "@/app/routes/not-found-route";
+import { RootRoute } from "@/app/routes/root-route";
+import { RouteError } from "@/app/routes/route-error";
 
 export const router = createBrowserRouter([
   {
-    path: "/app",
-    element: <App />,
+    path: "/",
+    element: <RootRoute />,
+    errorElement: <RouteError />,
+  },
+  {
+    path: "*",
+    element: <NotFoundRoute />,
   },
 ]);
