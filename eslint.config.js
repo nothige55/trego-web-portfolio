@@ -202,5 +202,11 @@ export default defineConfig([
       "jsx-a11y/no-static-element-interactions": "off",
     },
   },
+  {
+    files: ["src/testing/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
   prettier,
 ]);
