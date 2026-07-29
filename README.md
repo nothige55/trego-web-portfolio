@@ -1,75 +1,51 @@
-# React + TypeScript + Vite
+# Trego Web Portfolio
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+기존 Trego 프론트엔드의 핵심 여행 계획 흐름을 기능 단위로 이식하는 포트폴리오용 웹 애플리케이션입니다.
 
-Currently, two official plugins are available:
+## 기술 구성
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19, TypeScript, Vite
+- React Router
+- Tailwind CSS v4, shadcn/ui
+- Vitest, React Testing Library
 
-## React Compiler
+## 시작하기
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Node.js와 npm을 준비한 뒤 의존성을 설치하고 개발 서버를 실행합니다.
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 환경변수
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| 이름                | 필수 여부 | 설명                                                       |
+| ------------------- | --------- | ---------------------------------------------------------- |
+| `VITE_API_BASE_URL` | 선택      | REST API 기준 URL. 비워두면 현재 origin의 상대 경로를 사용 |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+환경변수는 `src/config`에서 검증하고 정규화합니다. API 주소를 지정한다면 `http` 또는 `https` 절대 URL을 사용해야 합니다. 개발 환경에서 값을 비워두면 Vite가 `/api` 요청을 기존 백엔드 주소인 `http://localhost:3000`으로 전달합니다.
 
+## 주요 명령어
+
+```bash
+npm run dev          # 개발 서버
+npm run lint         # ESLint 검사
+npm run format:check # Prettier 검사
+npm test             # 전체 테스트 1회 실행
+npm run build        # 타입 검사 및 프로덕션 빌드
 ```
+
+## 구조
+
+`src`는 Bulletproof React 스타일의 단방향 의존성을 따릅니다.
+
+- `app`: 앱 엔트리, 라우팅, 전역 provider와 feature 조합
+- `features`: 사용자 기능 단위 모듈
+- `components`: 도메인에 종속되지 않는 공용 UI
+- `config`: 환경변수와 전역 설정
+- `lib`: 사전 구성한 외부 라이브러리와 기반 client
+- `testing`: 공통 테스트 설정과 render helper
+
+공용 레이어는 `features`나 `app`을 참조하지 않으며, feature 간 직접 참조도 허용하지 않습니다.
