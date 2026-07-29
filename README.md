@@ -21,11 +21,12 @@ npm run dev
 
 ## 환경변수
 
-| 이름                | 필수 여부 | 설명                                                       |
-| ------------------- | --------- | ---------------------------------------------------------- |
-| `VITE_API_BASE_URL` | 선택      | REST API 기준 URL. 비워두면 현재 origin의 상대 경로를 사용 |
+| 이름                    | 필수 여부 | 설명                                                                    |
+| ----------------------- | --------- | ----------------------------------------------------------------------- |
+| `VITE_API_BASE_URL`     | 선택      | REST API 기준 URL. 비워두면 현재 origin의 상대 경로를 사용              |
+| `VITE_SIGNALR_HUB_URL`  | 선택      | SignalR Hub URL. 비워두면 API origin의 `/project` 또는 로컬 proxy를 사용 |
 
-환경변수는 `src/config`에서 검증하고 정규화합니다. API 주소를 지정한다면 `http` 또는 `https` 절대 URL을 사용해야 합니다. 개발 환경에서 값을 비워두면 Vite가 `/api` 요청을 기존 백엔드 주소인 `http://localhost:3000`으로 전달합니다.
+환경변수는 `src/config`에서 검증하고 정규화합니다. API 주소를 지정한다면 `http` 또는 `https` 절대 URL을 사용해야 합니다. SignalR Hub는 절대 URL 또는 `/project` 같은 root-relative 경로를 사용할 수 있습니다. 개발 환경에서 값을 비워두면 Vite가 `/api`와 `/project` 요청을 기존 백엔드 주소인 `http://localhost:3000`으로 전달합니다.
 
 ## 주요 명령어
 
