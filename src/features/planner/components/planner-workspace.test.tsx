@@ -43,6 +43,18 @@ describe("PlannerWorkspace", () => {
     expect(screen.getByRole("heading", { name: "제주도 7일 여행" })).toBeInTheDocument();
   });
 
+  it("makes every rendered planner row sortable while keeping the project root hidden", async () => {
+    await renderPlanner();
+    const tree = screen.getByRole("tree", { name: "여행 일정" });
+    const treeItems = within(tree).getAllByRole("treeitem");
+
+    expect(treeItems.length).toBeGreaterThan(0);
+    treeItems.forEach((treeItem) => {
+      expect(treeItem).toHaveAttribute("aria-roledescription", "sortable");
+    });
+    expect(within(tree).queryByText("제주도 7일 여행")).not.toBeInTheDocument();
+  });
+
   it("expands a branch, selects a range, and clears the selection from empty space", async () => {
     const user = await renderPlanner();
     const tree = screen.getByRole("tree", { name: "여행 일정" });
