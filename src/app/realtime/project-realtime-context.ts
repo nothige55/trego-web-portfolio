@@ -4,7 +4,7 @@ import type { ProjectRealtimeSessionSnapshot } from "@/app/realtime/project-real
 import type { SignalRClient } from "@/lib/signalr-client";
 
 export interface ProjectRealtimeContextValue extends ProjectRealtimeSessionSnapshot {
-  readonly client: SignalRClient | null;
+  readonly client: SignalRClient;
   readonly retry: () => Promise<void>;
 }
 

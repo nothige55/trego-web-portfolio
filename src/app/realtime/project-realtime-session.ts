@@ -50,7 +50,7 @@ export function createProjectRealtimeSession({
     listeners.forEach((listener) => listener(snapshot));
   }
 
-  async function connectJoinAndSync(shouldResync: boolean): Promise<void> {
+  async function connectJoinAndSync(): Promise<void> {
     if (isStopped) {
       throw new Error("Project realtime session is stopped.");
     }
@@ -65,12 +65,8 @@ export function createProjectRealtimeSession({
       try {
         await client.start();
         await client.invoke("JoinProject", projectId);
-
-        if (shouldResync) {
-          await resync();
-        }
-
         hasJoined = true;
+        await resync();
         publish({ error: null, isReady: true, status: client.getStatus() });
       } catch (error) {
         const sessionError = toError(error);
@@ -97,7 +93,7 @@ export function createProjectRealtimeSession({
     }
 
     if (shouldRecover) {
-      void connectJoinAndSync(true).catch(() => undefined);
+      void connectJoinAndSync().catch(() => undefined);
     }
   });
 
@@ -106,10 +102,10 @@ export function createProjectRealtimeSession({
       return snapshot;
     },
     retry() {
-      return connectJoinAndSync(hasJoined);
+      return connectJoinAndSync();
     },
     start() {
-      return connectJoinAndSync(false);
+      return connectJoinAndSync();
     },
     async stop() {
       if (isStopped) {

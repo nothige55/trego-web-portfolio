@@ -47,18 +47,21 @@ describe("createProjectRealtimeSession", () => {
   it("registers feature events before connecting and joins the project once", async () => {
     const order: string[] = [];
     const { client } = createFakeClient(order);
+    const resync = vi.fn(async () => {
+      order.push("resync");
+    });
     const session = createProjectRealtimeSession({
       client,
       projectId: "project-id",
       registerSubscriptions: () => {
         order.push("register");
       },
-      resync: vi.fn(),
+      resync,
     });
 
     await session.start();
 
-    expect(order).toEqual(["register", "start", "invoke:JoinProject"]);
+    expect(order).toEqual(["register", "start", "invoke:JoinProject", "resync"]);
     expect(client.invoke).toHaveBeenCalledWith("JoinProject", "project-id");
     expect(session.getSnapshot()).toMatchObject({ isReady: true, status: "connected" });
   });
@@ -81,7 +84,7 @@ describe("createProjectRealtimeSession", () => {
     emit("reconnecting");
     expect(session.getSnapshot().isReady).toBe(false);
     emit("connected");
-    await vi.waitFor(() => expect(resync).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(resync).toHaveBeenCalledTimes(2));
 
     expect(order).toEqual(["invoke:JoinProject", "resync"]);
     expect(session.getSnapshot()).toMatchObject({ isReady: true, status: "connected" });
@@ -103,7 +106,7 @@ describe("createProjectRealtimeSession", () => {
 
     expect(client.start).toHaveBeenCalledTimes(2);
     expect(client.invoke).toHaveBeenCalledTimes(2);
-    expect(resync).toHaveBeenCalledTimes(1);
+    expect(resync).toHaveBeenCalledTimes(2);
   });
 
   it("surfaces join failures without marking writes as ready", async () => {

@@ -7,6 +7,7 @@ import type {
   PlannerNodePathId,
   PlannerTree,
 } from "@/features/planner/types/planner-node";
+import type { PlannerProjectDetails } from "@/features/planner/types/planner-project";
 import { buildPlannerTree } from "@/features/planner/utils/build-planner-tree";
 import {
   calculateShiftSelection,
@@ -17,6 +18,8 @@ import { getVisiblePlannerNodes } from "@/features/planner/utils/get-visible-pla
 export type PlannerModule = "explore" | "chat";
 
 type PlannerViewState = {
+  readonly nodes: readonly PlannerNode[];
+  readonly projectDetails: PlannerProjectDetails | null;
   readonly tree: PlannerTree;
   readonly rootPathId: PlannerNodePathId | null;
   readonly expandedIds: ReadonlySet<PlannerNodePathId>;
@@ -30,6 +33,8 @@ type PlannerViewState = {
 
 type PlannerViewActions = {
   load: (nodes: readonly PlannerNode[]) => void;
+  replaceNodes: (nodes: readonly PlannerNode[]) => void;
+  setProjectDetails: (projectDetails: PlannerProjectDetails) => void;
   reset: () => void;
   toggleExpanded: (pathId: PlannerNodePathId) => void;
   expandNode: (pathId: PlannerNodePathId) => void;
@@ -55,6 +60,8 @@ function createEmptyTree(): PlannerTree {
 
 function createInitialState(): PlannerViewState {
   return {
+    nodes: [],
+    projectDetails: null,
     tree: createEmptyTree(),
     rootPathId: null,
     expandedIds: new Set(),
@@ -70,11 +77,12 @@ function createInitialState(): PlannerViewState {
 export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
   ...createInitialState(),
   load(nodes) {
-    // 원본 노드는 보관하지 않고 화면 조회에 필요한 세 가지 파생 구조로 즉시 변환한다.
+    // 정규화된 원본 노드와 화면 조회에 필요한 세 가지 파생 구조를 함께 갱신한다.
     const tree = buildPlannerTree(nodes);
     const rootNode = tree.flattenedItems.find((node) => node.parentPathId === null) ?? null;
 
     set({
+      nodes: [...nodes],
       tree,
       rootPathId: rootNode?.pathId ?? null,
       expandedIds: new Set(rootNode ? [rootNode.pathId] : []),
@@ -83,6 +91,35 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
       multiSelectedIds: [],
       selectionRangeIds: [],
     });
+  },
+  replaceNodes(nodes) {
+    set((state) => {
+      const tree = buildPlannerTree(nodes);
+      const rootNode = tree.flattenedItems.find((node) => node.parentPathId === null) ?? null;
+      const expandedIds = new Set(
+        [...state.expandedIds].filter((pathId) => tree.entityMap.has(pathId)),
+      );
+
+      if (rootNode) {
+        expandedIds.add(rootNode.pathId);
+      }
+
+      return {
+        nodes: [...nodes],
+        tree,
+        rootPathId: rootNode?.pathId ?? null,
+        expandedIds,
+        selectedItemId:
+          state.selectedItemId && tree.entityMap.has(state.selectedItemId)
+            ? state.selectedItemId
+            : null,
+        multiSelectedIds: state.multiSelectedIds.filter((pathId) => tree.entityMap.has(pathId)),
+        selectionRangeIds: state.selectionRangeIds.filter((pathId) => tree.entityMap.has(pathId)),
+      };
+    });
+  },
+  setProjectDetails(projectDetails) {
+    set({ projectDetails });
   },
   reset() {
     set(createInitialState());

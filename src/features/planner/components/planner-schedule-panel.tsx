@@ -211,6 +211,7 @@ function PlannerTreeItem({
 }
 
 export function PlannerSchedulePanel() {
+  const projectDetails = usePlannerViewStore((state) => state.projectDetails) ?? demoPlannerProject;
   const tree = usePlannerViewStore((state) => state.tree);
   const rootPathId = usePlannerViewStore((state) => state.rootPathId);
   const expandedIds = usePlannerViewStore((state) => state.expandedIds);
@@ -227,7 +228,7 @@ export function PlannerSchedulePanel() {
     [expandedIds, tree.childrenMap, tree.flattenedItems],
   );
   const dayNumberByPathId = useMemo(() => {
-    const startDate = new Date(`${demoPlannerProject.startDate}T00:00:00Z`);
+    const startDate = new Date(`${projectDetails.startDate}T00:00:00Z`);
     const dayNumbers = new Map<PlannerNodePathId, number>();
     let dayOffset = 0;
 
@@ -243,7 +244,7 @@ export function PlannerSchedulePanel() {
     });
 
     return dayNumbers;
-  }, [tree.flattenedItems]);
+  }, [projectDetails.startDate, tree.flattenedItems]);
   // root는 프로젝트 컨테이너이므로 탐색 순서에는 사용하되 목록에서는 숨긴다.
   const renderedItems = useMemo(
     () => visibleItems.filter((item) => item.pathId !== rootPathId),
@@ -354,13 +355,13 @@ export function PlannerSchedulePanel() {
         <p className="text-xs font-semibold tracking-wide text-brand">Trego Planner</p>
         <div className="mt-2 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold">{demoPlannerProject.title}</h1>
+            <h1 className="truncate text-lg font-semibold">{projectDetails.title}</h1>
             <p className="mt-1 text-xs text-muted-foreground">
               여행 메모와 태그 기능을 준비 중입니다.
             </p>
           </div>
           <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">
-            {formatDateRange(demoPlannerProject.startDate, demoPlannerProject.endDate)}
+            {formatDateRange(projectDetails.startDate, projectDetails.endDate)}
           </span>
         </div>
       </header>

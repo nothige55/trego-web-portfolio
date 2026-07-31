@@ -1,9 +1,7 @@
 import type { PlannerActivityNode, PlannerNode } from "@/features/planner/types/planner-node";
+import type { PlannerProjectDetails } from "@/features/planner/types/planner-project";
 
-export type DemoPlannerProject = {
-  readonly title: string;
-  readonly startDate: string;
-  readonly endDate: string;
+export type DemoPlannerProject = PlannerProjectDetails & {
   readonly nodes: readonly PlannerNode[];
 };
 
@@ -67,9 +65,11 @@ function createActivity({
 // API 이식 전 Planner 화면과 상호작용 테스트에 사용하는 결정론적 데이터다.
 // 서버 DTO를 흉내 내지 않고, 이미 정규화된 PlannerNode 계약만 사용한다.
 export const demoPlannerProject: DemoPlannerProject = {
+  publicId: "demo",
   title: "제주도 7일 여행",
   startDate: "2026-08-12",
   endDate: "2026-08-18",
+  isPublic: false,
   nodes: [
     // root는 프로젝트 전체를 감싸는 가상 컨테이너이며 화면 목록에서는 숨긴다.
     {

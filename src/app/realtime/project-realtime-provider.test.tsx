@@ -106,6 +106,6 @@ describe("ProjectRealtimeProvider", () => {
 
     await waitFor(() => expect(fake.invokeMock).toHaveBeenCalledTimes(2));
     expect(fake.startMock).toHaveBeenCalledTimes(2);
-    expect(resync).toHaveBeenCalledTimes(1);
+    expect(resync).toHaveBeenCalledTimes(2);
   });
 });
