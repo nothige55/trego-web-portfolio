@@ -81,6 +81,8 @@
 - import는 `@/*` alias를 우선 사용합니다.
 - `src/components/ui`의 shadcn 생성 코드는 프로젝트 ESLint 예외 범위를 유지합니다.
 - shadcn 컴포넌트는 `src/components/ui`에 설치하고 직접 수정한 코드는 저장소가 소유합니다.
+- Dialog, Popover, date picker, dropdown처럼 열림 상태, 포커스, 키보드 조작을 관리하는 UI는 shadcn 컴포넌트를 적극적으로 우선 사용합니다.
+- 단순 버튼과 텍스트 입력처럼 semantic HTML만으로 충분한 요소는 shadcn 사용을 강제하지 않으며, 필요한 상호작용 컴포넌트만 CLI로 `src/components/ui`에 추가합니다.
 
 ## 6. 테스트 기준
 

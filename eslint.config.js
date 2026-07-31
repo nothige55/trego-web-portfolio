@@ -190,6 +190,7 @@ export default defineConfig([
     files: ["src/components/ui/**/*.{ts,tsx}"],
     rules: {
       "react-refresh/only-export-components": "off",
+      "react/no-unstable-nested-components": "off",
       "simple-import-sort/imports": "off",
       "simple-import-sort/exports": "off",
       "react/button-has-type": "off",

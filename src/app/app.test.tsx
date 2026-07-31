@@ -9,6 +9,8 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Trego" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "어떤 여행을 계획하고 있나요?" }),
+    ).toBeInTheDocument();
   });
 });
