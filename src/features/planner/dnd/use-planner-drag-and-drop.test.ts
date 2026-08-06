@@ -79,6 +79,30 @@ function createFixture() {
   };
 }
 
+function dragEvent(
+  overPathId: string,
+  {
+    activeTop = 90,
+    overTop = 100,
+    deltaX = 0,
+    deltaY = 10,
+  }: {
+    activeTop?: number;
+    overTop?: number;
+    deltaX?: number;
+    deltaY?: number;
+  } = {},
+) {
+  return {
+    active: {
+      id: "active",
+      rect: { current: { translated: { top: activeTop } } },
+    },
+    over: { id: overPathId, rect: { top: overTop } },
+    delta: { x: deltaX, y: deltaY },
+  } as never;
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -106,14 +130,17 @@ describe("usePlannerDragAndDrop", () => {
       result.current.handleDragStart({ active: { id: "active" } } as never);
     });
     act(() => {
-      result.current.handleDragOver({ over: { id: "wish" } } as never);
-      vi.advanceTimersByTime(800);
+      result.current.handleDragMove(dragEvent("wish"));
     });
 
     expect(result.current.childTargetPathId).toBe("wish");
 
     act(() => {
-      result.current.handleDragEnd({ over: { id: "wish" } } as never);
+      vi.advanceTimersByTime(800);
+    });
+
+    act(() => {
+      result.current.handleDragEnd(dragEvent("wish"));
     });
 
     expect(selectItem).toHaveBeenCalledWith("active");
@@ -144,14 +171,48 @@ describe("usePlannerDragAndDrop", () => {
       result.current.handleDragStart({ active: { id: "active" } } as never);
     });
     act(() => {
-      result.current.handleDragOver({ over: { id: "target" } } as never);
+      result.current.handleDragMove(dragEvent("target"));
       vi.advanceTimersByTime(999);
     });
+    expect(result.current.expandingTargetPathId).toBe("target");
     expect(expandNode).not.toHaveBeenCalled();
 
     act(() => {
       vi.advanceTimersByTime(1);
     });
     expect(expandNode).toHaveBeenCalledWith("target");
+    expect(result.current.expandingTargetPathId).toBeNull();
+  });
+
+  it("does not arm a child drop after the active row has passed the target edge", () => {
+    vi.useFakeTimers();
+    const { tree, visibleItems } = createFixture();
+    const moveNode = vi.fn();
+    const { result } = renderHook(() =>
+      usePlannerDragAndDrop({
+        tree,
+        rootPathId: "root",
+        visibleItems,
+        expandedIds: new Set(["root", "region", "source"]),
+        expandNode: vi.fn(),
+        moveNode,
+        selectItem: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleDragStart({ active: { id: "active" } } as never);
+    });
+    act(() => {
+      result.current.handleDragMove(dragEvent("wish", { activeTop: 120 }));
+      vi.advanceTimersByTime(800);
+    });
+
+    expect(result.current.childTargetPathId).toBeNull();
+
+    act(() => {
+      result.current.handleDragEnd(dragEvent("wish", { activeTop: 120 }));
+    });
+    expect(moveNode).not.toHaveBeenCalled();
   });
 });

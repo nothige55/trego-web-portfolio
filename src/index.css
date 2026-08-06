@@ -14,6 +14,35 @@
   }
 }
 
+@keyframes planner-child-drop-fill {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.planner-child-drop-fill {
+  position: relative;
+  overflow: hidden;
+}
+
+.planner-child-drop-fill::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: color-mix(in srgb, var(--brand) 15%, transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: planner-child-drop-fill 1s ease-in forwards;
+}
+
+.planner-child-drop-fill > * {
+  position: relative;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

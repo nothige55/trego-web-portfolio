@@ -21,4 +21,17 @@ describe("demoPlannerProject", () => {
       expect(tree.childrenMap.get(day.pathId)).toHaveLength(4);
     });
   });
+
+  it("uses the legacy default folder contract for region containers", () => {
+    const tree = buildPlannerTree(demoPlannerProject.nodes);
+
+    expect(tree.entityMap.get("region-jeju")).toMatchObject({
+      kind: "folder",
+      folderType: "default",
+    });
+    expect(tree.entityMap.get("region-seogwipo")).toMatchObject({
+      kind: "folder",
+      folderType: "default",
+    });
+  });
 });

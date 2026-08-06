@@ -1,7 +1,6 @@
 import {
   type DragEndEvent,
   type DragMoveEvent,
-  type DragOverEvent,
   type DragStartEvent,
   PointerSensor,
   useSensor,
@@ -11,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { calculatePlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import {
+  isPlannerChildHover,
   removeActiveDescendants,
   resolvePlannerDrop,
 } from "@/features/planner/dnd/resolve-planner-drop";
@@ -56,10 +56,14 @@ export function usePlannerDragAndDrop({
   );
   const [activePathId, setActivePathId] = useState<PlannerNodePathId | null>(null);
   const [childTargetPathId, setChildTargetPathId] = useState<PlannerNodePathId | null>(null);
+  const [expandingTargetPathId, setExpandingTargetPathId] = useState<PlannerNodePathId | null>(
+    null,
+  );
+  const [isSiblingDropActive, setIsSiblingDropActive] = useState(false);
   const [horizontalOffset, setHorizontalOffset] = useState(0);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const overPathIdRef = useRef<PlannerNodePathId | null>(null);
-  const childTargetPathIdRef = useRef<PlannerNodePathId | null>(null);
+  const hoverKeyRef = useRef<string | null>(null);
+  const readyChildTargetPathIdRef = useRef<PlannerNodePathId | null>(null);
   const sortableItems = useMemo(
     () => removeActiveDescendants(visibleItems, activePathId),
     [activePathId, visibleItems],
@@ -70,14 +74,16 @@ export function usePlannerDragAndDrop({
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
-    childTargetPathIdRef.current = null;
+    hoverKeyRef.current = null;
+    readyChildTargetPathIdRef.current = null;
     setChildTargetPathId(null);
+    setExpandingTargetPathId(null);
   }
 
   function resetDragState(): void {
     clearHoverState();
-    overPathIdRef.current = null;
     setActivePathId(null);
+    setIsSiblingDropActive(false);
     setHorizontalOffset(0);
   }
 
@@ -98,50 +104,76 @@ export function usePlannerDragAndDrop({
 
   function handleDragMove(event: DragMoveEvent): void {
     setHorizontalOffset(event.delta.x);
-  }
 
-  function handleDragOver(event: DragOverEvent): void {
     if (!rootPathId || !activePathId || !event.over) {
       clearHoverState();
+      setIsSiblingDropActive(false);
       return;
     }
 
     const overPathId = String(event.over.id);
-    if (overPathIdRef.current === overPathId) {
+    const activeTop = event.active.rect.current.translated?.top;
+    const isChildHover =
+      activeTop !== undefined &&
+      isPlannerChildHover({
+        overTop: event.over.rect.top,
+        activeTop,
+        deltaY: event.delta.y,
+      });
+    const children = (tree.childrenMap.get(overPathId) ?? []).filter(
+      (node) => node.pathId !== activePathId,
+    );
+    const childResult = isChildHover
+      ? calculatePlannerDropDestination(tree, {
+          rootPathId,
+          activePathId,
+          parentPathId: overPathId,
+          siblingIndex: children.length,
+        })
+      : null;
+
+    if (childResult?.accepted && (children.length === 0 || !expandedIds.has(overPathId))) {
+      setIsSiblingDropActive(false);
+      const hoverKey = `child:${overPathId}`;
+      if (hoverKeyRef.current === hoverKey) {
+        return;
+      }
+
+      clearHoverState();
+      hoverKeyRef.current = hoverKey;
+
+      if (children.length > 0) {
+        if (!expandedIds.has(overPathId)) {
+          setExpandingTargetPathId(overPathId);
+          hoverTimerRef.current = setTimeout(() => {
+            setExpandingTargetPathId(null);
+            expandNode(overPathId);
+            hoverTimerRef.current = null;
+          }, COLLAPSED_EXPAND_DELAY);
+        }
+        return;
+      }
+
+      // 기존 Planner의 fill cue처럼 빈 컨테이너 진입 즉시 시각 상태를 켜고,
+      // 실제 child drop 승인은 800ms 뒤에만 허용한다.
+      setChildTargetPathId(overPathId);
+      hoverTimerRef.current = setTimeout(() => {
+        readyChildTargetPathIdRef.current = overPathId;
+        hoverTimerRef.current = null;
+      }, EMPTY_CHILD_DROP_DELAY);
       return;
     }
 
     clearHoverState();
-    overPathIdRef.current = overPathId;
-    const children = (tree.childrenMap.get(overPathId) ?? []).filter(
-      (node) => node.pathId !== activePathId,
-    );
-    const result = calculatePlannerDropDestination(tree, {
+    const siblingResult = resolvePlannerDrop({
+      tree,
       rootPathId,
       activePathId,
-      parentPathId: overPathId,
-      siblingIndex: children.length,
+      overPathId,
+      visibleItems: sortableItems,
+      horizontalOffset: event.delta.x,
     });
-
-    if (!result.accepted) {
-      return;
-    }
-
-    if (children.length > 0) {
-      if (!expandedIds.has(overPathId)) {
-        hoverTimerRef.current = setTimeout(() => {
-          expandNode(overPathId);
-          hoverTimerRef.current = null;
-        }, COLLAPSED_EXPAND_DELAY);
-      }
-      return;
-    }
-
-    hoverTimerRef.current = setTimeout(() => {
-      childTargetPathIdRef.current = overPathId;
-      setChildTargetPathId(overPathId);
-      hoverTimerRef.current = null;
-    }, EMPTY_CHILD_DROP_DELAY);
+    setIsSiblingDropActive(siblingResult.accepted || siblingResult.reason === "unchanged");
   }
 
   function handleDragEnd(event: DragEndEvent): void {
@@ -151,8 +183,16 @@ export function usePlannerDragAndDrop({
     }
 
     const overPathId = String(event.over.id);
+    const activeTop = event.active.rect.current.translated?.top;
+    const isChildHover =
+      activeTop !== undefined &&
+      isPlannerChildHover({
+        overTop: event.over.rect.top,
+        activeTop,
+        deltaY: event.delta.y,
+      });
     const result =
-      childTargetPathIdRef.current === overPathId
+      readyChildTargetPathIdRef.current === overPathId && isChildHover
         ? calculatePlannerDropDestination(tree, {
             rootPathId,
             activePathId,
@@ -180,11 +220,12 @@ export function usePlannerDragAndDrop({
   return {
     activePathId,
     childTargetPathId,
+    expandingTargetPathId,
     handleDragCancel: resetDragState,
     handleDragEnd,
     handleDragMove,
-    handleDragOver,
     handleDragStart,
+    isSiblingDropActive,
     sensors,
     sortableItems,
   };

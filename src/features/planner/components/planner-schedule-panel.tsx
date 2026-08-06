@@ -1,5 +1,5 @@
 import { closestCenter, DndContext, DragOverlay } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight, ListChevronsDownUp } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -55,12 +55,16 @@ function PlannerTreeItem({
   itemRef,
   boundaryAncestor,
   isChildTarget,
+  isExpandingTarget,
+  isSiblingDropActive,
 }: {
   readonly node: FlattenedPlannerNode;
   readonly dayNumber?: number;
   readonly itemRef: (element: HTMLLIElement | null) => void;
   readonly boundaryAncestor?: FlattenedPlannerNode;
   readonly isChildTarget: boolean;
+  readonly isExpandingTarget: boolean;
+  readonly isSiblingDropActive: boolean;
 }) {
   const entityMap = usePlannerViewStore((state) => state.tree.entityMap);
   const childrenMap = usePlannerViewStore((state) => state.tree.childrenMap);
@@ -70,8 +74,9 @@ function PlannerTreeItem({
   const selectionRangeIds = usePlannerViewStore((state) => state.selectionRangeIds);
   const toggleExpanded = usePlannerViewStore((state) => state.toggleExpanded);
   const selectItem = usePlannerViewStore((state) => state.selectItem);
-  const { attributes, isDragging, isOver, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: node.pathId });
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+    id: node.pathId,
+  });
   const hasChildren = (childrenMap.get(node.pathId) ?? []).length > 0;
   const isExpanded = expandedIds.has(node.pathId);
   // Shift 선택 중에는 정규화된 작업 대상만 강하게 표시한다. anchor는 범위 계산 기준으로만 남긴다.
@@ -100,20 +105,14 @@ function PlannerTreeItem({
       aria-expanded={hasChildren ? isExpanded : undefined}
       aria-selected={isSelected}
       data-selection-state={isSelected ? "selected" : isSelectionContext ? "range" : undefined}
-      data-drop-state={isChildTarget ? "child" : isOver ? "sibling" : undefined}
+      data-drop-state={isChildTarget ? "child" : isExpandingTarget ? "expanding" : undefined}
       className="relative cursor-grab touch-none list-none active:cursor-grabbing"
       style={{
-        opacity: isDragging ? 0.25 : 1,
-        transform: CSS.Transform.toString(transform),
+        opacity: isDragging ? 0 : 1,
+        transform: CSS.Transform.toString(isSiblingDropActive ? transform : null),
         transition,
       }}
     >
-      {isOver && !isChildTarget ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 z-40 h-0.5 bg-brand"
-        />
-      ) : null}
       {boundaryAncestor ? (
         <div
           aria-hidden="true"
@@ -134,12 +133,14 @@ function PlannerTreeItem({
       <div
         className={`group flex min-h-9 items-center border-l-2 transition-colors ${
           isChildTarget
-            ? "border-brand bg-brand/15 text-foreground"
-            : isSelected
-              ? "border-brand bg-brand/10 text-foreground"
-              : isSelectionContext
-                ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
-                : "border-transparent text-foreground hover:bg-muted/70"
+            ? "planner-child-drop-fill border-brand text-foreground"
+            : isExpandingTarget
+              ? "border-brand/60 bg-brand/5 text-foreground"
+              : isSelected
+                ? "border-brand bg-brand/10 text-foreground"
+                : isSelectionContext
+                  ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
+                  : "border-transparent text-foreground hover:bg-muted/70"
         }`}
         style={{ paddingLeft: indentation }}
       >
@@ -229,11 +230,12 @@ export function PlannerSchedulePanel() {
   const {
     activePathId,
     childTargetPathId,
+    expandingTargetPathId,
     handleDragCancel,
     handleDragEnd,
     handleDragMove,
-    handleDragOver,
     handleDragStart,
+    isSiblingDropActive,
     sensors,
     sortableItems,
   } = usePlannerDragAndDrop({
@@ -356,13 +358,9 @@ export function PlannerSchedulePanel() {
             onDragCancel={handleDragCancel}
             onDragEnd={handleDragEnd}
             onDragMove={handleDragMove}
-            onDragOver={handleDragOver}
             onDragStart={handleDragStart}
           >
-            <SortableContext
-              items={sortableItems.map((node) => node.pathId)}
-              strategy={verticalListSortingStrategy}
-            >
+            <SortableContext items={sortableItems.map((node) => node.pathId)}>
               <ul
                 role="tree"
                 aria-label="여행 일정"
@@ -398,6 +396,8 @@ export function PlannerSchedulePanel() {
                       dayNumber={dayNumberByPathId.get(node.pathId)}
                       boundaryAncestor={boundaryAncestor}
                       isChildTarget={childTargetPathId === node.pathId}
+                      isExpandingTarget={expandingTargetPathId === node.pathId}
+                      isSiblingDropActive={isSiblingDropActive}
                       itemRef={(element) => {
                         if (element) {
                           itemRefs.current.set(node.pathId, element);
@@ -410,22 +410,28 @@ export function PlannerSchedulePanel() {
                 })}
               </ul>
             </SortableContext>
-            <DragOverlay dropAnimation={null}>
-              {activeNode ? (
-                <div className="flex min-h-9 w-72 items-center rounded-md border border-brand/30 bg-card/95 px-3 shadow-lg">
-                  <PlannerNodeLabel
-                    node={activeNode}
-                    dayNumber={dayNumberByPathId.get(activeNode.pathId)}
-                    parent={
-                      activeNode.parentPathId
-                        ? tree.entityMap.get(activeNode.parentPathId)
-                        : undefined
-                    }
-                    className="w-full py-2.5"
-                  />
+            {activeNode ? (
+              <DragOverlay>
+                <div className="pointer-events-none w-80 bg-card">
+                  <div
+                    className="flex min-h-9 items-center border-l-2 border-brand bg-brand/10 text-foreground"
+                    style={{ paddingLeft: Math.max(0, activeNode.depth - 1) * 30 }}
+                  >
+                    <span className="h-9 w-5 shrink-0" aria-hidden="true" />
+                    <PlannerNodeLabel
+                      node={activeNode}
+                      dayNumber={dayNumberByPathId.get(activeNode.pathId)}
+                      parent={
+                        activeNode.parentPathId
+                          ? tree.entityMap.get(activeNode.parentPathId)
+                          : undefined
+                      }
+                      className="flex-1 py-2.5 pr-2"
+                    />
+                  </div>
                 </div>
-              ) : null}
-            </DragOverlay>
+              </DragOverlay>
+            ) : null}
           </DndContext>
         </div>
       </div>

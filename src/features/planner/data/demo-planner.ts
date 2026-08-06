@@ -132,7 +132,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       parentPathId: "root",
       position: 1,
       color: "#F59E0B",
-      folderType: "region",
+      folderType: "default",
     },
     {
       id: "demo-region-seogwipo",
@@ -142,7 +142,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       parentPathId: "root",
       position: 2,
       color: "#14B8A6",
-      folderType: "region",
+      folderType: "default",
     },
 
     // 제주도 1일차: 공항 도착 후 서쪽 해안으로 이동한다.

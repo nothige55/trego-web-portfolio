@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isPlannerChildHover,
   removeActiveDescendants,
   resolvePlannerDrop,
 } from "@/features/planner/dnd/resolve-planner-drop";
@@ -75,6 +76,7 @@ function createTree() {
     activity("last", "day-one", 0.3),
     day("day-two", "region", 0.2),
     activity("group", "day-two", 0.1, "group"),
+    day("day-three", "region", 0.3),
   ];
   return buildPlannerTree(nodes);
 }
@@ -98,7 +100,7 @@ describe("resolvePlannerDrop", () => {
     });
   });
 
-  it("uses a positive horizontal offset to nest a single activity under a group activity", () => {
+  it("keeps a group hover as a sibling drop until the child hover delay is satisfied", () => {
     const tree = createTree();
 
     expect(
@@ -112,7 +114,7 @@ describe("resolvePlannerDrop", () => {
       }),
     ).toEqual({
       accepted: true,
-      destination: { parentPathId: "group", siblingIndex: 0, position: 0.1 },
+      destination: { parentPathId: "day-two", siblingIndex: 1, position: 0.2 },
     });
   });
 
@@ -129,6 +131,38 @@ describe("resolvePlannerDrop", () => {
 
     expect(result.accepted).toBe(false);
   });
+
+  it("places a day before the hovered day after an expanded previous branch", () => {
+    const tree = createTree();
+
+    const result = resolvePlannerDrop({
+      tree,
+      rootPathId: "root",
+      visibleItems: tree.flattenedItems.filter((item) => item.pathId !== "root"),
+      activePathId: "day-three",
+      overPathId: "day-two",
+      horizontalOffset: 0,
+    });
+
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) {
+      return;
+    }
+    expect(result.destination).toMatchObject({ parentPathId: "region", siblingIndex: 1 });
+    expect(result.destination.position).toBeCloseTo(0.15);
+  });
+});
+
+describe("isPlannerChildHover", () => {
+  it("matches the legacy directional row-edge threshold", () => {
+    expect(isPlannerChildHover({ overTop: 100, activeTop: 90, deltaY: 10 })).toBe(true);
+    expect(isPlannerChildHover({ overTop: 100, activeTop: 110, deltaY: -10 })).toBe(true);
+  });
+
+  it("does not treat a row that the active item already passed as a child hover", () => {
+    expect(isPlannerChildHover({ overTop: 100, activeTop: 120, deltaY: 10 })).toBe(false);
+    expect(isPlannerChildHover({ overTop: 100, activeTop: 80, deltaY: -10 })).toBe(false);
+  });
 });
 
 describe("removeActiveDescendants", () => {
@@ -137,6 +171,6 @@ describe("removeActiveDescendants", () => {
 
     expect(
       removeActiveDescendants(tree.flattenedItems, "day-one").map((item) => item.pathId),
-    ).toEqual(["root", "region", "day-one", "day-two", "group"]);
+    ).toEqual(["root", "region", "day-one", "day-two", "group", "day-three"]);
   });
 });
