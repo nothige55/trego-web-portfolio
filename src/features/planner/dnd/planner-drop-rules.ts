@@ -115,8 +115,15 @@ function calculatePosition(
   }
 
   if (!previousSibling && nextSibling) {
-    const position = nextSibling.position / 2;
-    return Number.isFinite(position) && position < nextSibling.position ? position : null;
+    const midpointPosition = nextSibling.position / 2;
+    if (Number.isFinite(midpointPosition) && midpointPosition < nextSibling.position) {
+      return midpointPosition;
+    }
+
+    const precedingPosition = nextSibling.position - POSITION_STEP;
+    return Number.isFinite(precedingPosition) && precedingPosition < nextSibling.position
+      ? precedingPosition
+      : null;
   }
 
   if (previousSibling && !nextSibling) {

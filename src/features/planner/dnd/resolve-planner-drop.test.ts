@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculatePlannerDragFootprintHeight,
   isPlannerChildHover,
   removeActiveDescendants,
   resolvePlannerDrop,
@@ -81,6 +82,33 @@ function createTree() {
   return buildPlannerTree(nodes);
 }
 
+function createNestedActivityTree() {
+  const nodes: readonly PlannerNode[] = [
+    folder("root", null, 0),
+    folder("region", "root", 0.1),
+    day("source-day", "region", 0.1),
+    activity("active", "source-day", 0.1),
+    day("target-day", "region", 0.2),
+    activity("group", "target-day", 0.1, "group"),
+    activity("group-child", "group", 0.1),
+    day("next-day", "region", 0.3),
+  ];
+
+  return buildPlannerTree(nodes);
+}
+
+function createZeroBasedDayTree() {
+  const nodes: readonly PlannerNode[] = [
+    folder("root", null, 0),
+    folder("region", "root", 0.1),
+    day("first-day", "region", 0),
+    day("second-day", "region", 1),
+    day("active-day", "region", 2),
+  ];
+
+  return buildPlannerTree(nodes);
+}
+
 describe("resolvePlannerDrop", () => {
   it("calculates a same-parent trailing destination from the projected visible order", () => {
     const tree = createTree();
@@ -151,6 +179,42 @@ describe("resolvePlannerDrop", () => {
     expect(result.destination).toMatchObject({ parentPathId: "region", siblingIndex: 1 });
     expect(result.destination.position).toBeCloseTo(0.15);
   });
+
+  it("keeps an activity inside a group after its trailing child", () => {
+    const tree = createNestedActivityTree();
+
+    expect(
+      resolvePlannerDrop({
+        tree,
+        rootPathId: "root",
+        visibleItems: tree.flattenedItems.filter((item) => item.pathId !== "root"),
+        activePathId: "active",
+        overPathId: "group-child",
+        horizontalOffset: 0,
+      }),
+    ).toEqual({
+      accepted: true,
+      destination: { parentPathId: "group", siblingIndex: 1, position: 0.2 },
+    });
+  });
+
+  it("places a day before the zero-based first child of an expanded folder", () => {
+    const tree = createZeroBasedDayTree();
+
+    expect(
+      resolvePlannerDrop({
+        tree,
+        rootPathId: "root",
+        visibleItems: tree.flattenedItems.filter((item) => item.pathId !== "root"),
+        activePathId: "active-day",
+        overPathId: "first-day",
+        horizontalOffset: 0,
+      }),
+    ).toEqual({
+      accepted: true,
+      destination: { parentPathId: "region", siblingIndex: 0, position: -0.1 },
+    });
+  });
 });
 
 describe("isPlannerChildHover", () => {
@@ -172,5 +236,31 @@ describe("removeActiveDescendants", () => {
     expect(
       removeActiveDescendants(tree.flattenedItems, "day-one").map((item) => item.pathId),
     ).toEqual(["root", "region", "day-one", "day-two", "group", "day-three"]);
+  });
+});
+
+describe("calculatePlannerDragFootprintHeight", () => {
+  it("preserves the active row and all visible descendant heights", () => {
+    const tree = createTree();
+    const heights = new Map([
+      ["day-one", 36],
+      ["first", 42],
+      ["active", 48],
+      ["last", 54],
+    ]);
+
+    expect(
+      calculatePlannerDragFootprintHeight(
+        tree.flattenedItems,
+        "day-one",
+        (pathId) => heights.get(pathId) ?? 0,
+      ),
+    ).toBe(180);
+  });
+
+  it("does not add a spacer for a row without visible descendants", () => {
+    const tree = createTree();
+
+    expect(calculatePlannerDragFootprintHeight(tree.flattenedItems, "active", () => 36)).toBe(0);
   });
 });

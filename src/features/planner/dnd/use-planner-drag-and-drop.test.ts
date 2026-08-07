@@ -184,6 +184,77 @@ describe("usePlannerDragAndDrop", () => {
     expect(result.current.expandingTargetPathId).toBeNull();
   });
 
+  it("ignores layout-only movement immediately after a hover-expanded target opens", () => {
+    vi.useFakeTimers();
+    const { tree, visibleItems } = createFixture();
+    const expandNode = vi.fn();
+    const moveNode = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ expandedIds }: { expandedIds: ReadonlySet<string> }) =>
+        usePlannerDragAndDrop({
+          tree,
+          rootPathId: "root",
+          visibleItems,
+          expandedIds,
+          expandNode,
+          moveNode,
+          selectItem: vi.fn(),
+        }),
+      { initialProps: { expandedIds: new Set(["root", "region", "source"]) } },
+    );
+
+    act(() => {
+      result.current.handleDragStart({ active: { id: "active" } } as never);
+    });
+    act(() => {
+      result.current.handleDragMove(dragEvent("target", { activeTop: 90 }));
+      vi.advanceTimersByTime(1_000);
+    });
+    rerender({ expandedIds: new Set(["root", "region", "source", "target"]) });
+
+    act(() => {
+      result.current.handleDragMove(dragEvent("target", { activeTop: 94 }));
+    });
+    expect(result.current.isSiblingDropActive).toBe(false);
+
+    act(() => {
+      result.current.handleDragEnd(dragEvent("target", { activeTop: 94 }));
+    });
+    expect(moveNode).not.toHaveBeenCalled();
+  });
+
+  it("resumes drop projection after moving beyond the expanded-target threshold", () => {
+    vi.useFakeTimers();
+    const { tree, visibleItems } = createFixture();
+    const { result, rerender } = renderHook(
+      ({ expandedIds }: { expandedIds: ReadonlySet<string> }) =>
+        usePlannerDragAndDrop({
+          tree,
+          rootPathId: "root",
+          visibleItems,
+          expandedIds,
+          expandNode: vi.fn(),
+          moveNode: vi.fn(),
+          selectItem: vi.fn(),
+        }),
+      { initialProps: { expandedIds: new Set(["root", "region", "source"]) } },
+    );
+
+    act(() => {
+      result.current.handleDragStart({ active: { id: "active" } } as never);
+    });
+    act(() => {
+      result.current.handleDragMove(dragEvent("target", { activeTop: 90 }));
+      vi.advanceTimersByTime(1_000);
+    });
+    rerender({ expandedIds: new Set(["root", "region", "source", "target"]) });
+
+    act(() => {
+      result.current.handleDragMove(dragEvent("target", { activeTop: 98 }));
+    });
+    expect(result.current.isSiblingDropActive).toBe(true);
+  });
+
   it("does not arm a child drop after the active row has passed the target edge", () => {
     vi.useFakeTimers();
     const { tree, visibleItems } = createFixture();

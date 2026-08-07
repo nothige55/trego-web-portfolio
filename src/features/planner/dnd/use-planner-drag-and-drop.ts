@@ -22,6 +22,7 @@ import type {
 
 const EMPTY_CHILD_DROP_DELAY = 800;
 const COLLAPSED_EXPAND_DELAY = 1_000;
+const EXPANDED_DROP_STABILITY_THRESHOLD = 7.5;
 
 interface UsePlannerDragAndDropParams {
   readonly tree: PlannerTree;
@@ -64,6 +65,7 @@ export function usePlannerDragAndDrop({
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverKeyRef = useRef<string | null>(null);
   const readyChildTargetPathIdRef = useRef<PlannerNodePathId | null>(null);
+  const expandedTargetActiveTopRef = useRef<number | null>(null);
   const sortableItems = useMemo(
     () => removeActiveDescendants(visibleItems, activePathId),
     [activePathId, visibleItems],
@@ -82,6 +84,7 @@ export function usePlannerDragAndDrop({
 
   function resetDragState(): void {
     clearHoverState();
+    expandedTargetActiveTopRef.current = null;
     setActivePathId(null);
     setIsSiblingDropActive(false);
     setHorizontalOffset(0);
@@ -98,8 +101,25 @@ export function usePlannerDragAndDrop({
 
   function handleDragStart(event: DragStartEvent): void {
     const pathId = String(event.active.id);
+    expandedTargetActiveTopRef.current = null;
     setActivePathId(pathId);
     selectItem(pathId);
+  }
+
+  function shouldStabilizeExpandedTarget(activeTop: number | undefined): boolean {
+    if (expandedTargetActiveTopRef.current === null) {
+      return false;
+    }
+
+    if (
+      activeTop !== undefined &&
+      Math.abs(activeTop - expandedTargetActiveTopRef.current) > EXPANDED_DROP_STABILITY_THRESHOLD
+    ) {
+      expandedTargetActiveTopRef.current = null;
+      return false;
+    }
+
+    return true;
   }
 
   function handleDragMove(event: DragMoveEvent): void {
@@ -147,6 +167,7 @@ export function usePlannerDragAndDrop({
           setExpandingTargetPathId(overPathId);
           hoverTimerRef.current = setTimeout(() => {
             setExpandingTargetPathId(null);
+            expandedTargetActiveTopRef.current = activeTop ?? null;
             expandNode(overPathId);
             hoverTimerRef.current = null;
           }, COLLAPSED_EXPAND_DELAY);
@@ -161,6 +182,12 @@ export function usePlannerDragAndDrop({
         readyChildTargetPathIdRef.current = overPathId;
         hoverTimerRef.current = null;
       }, EMPTY_CHILD_DROP_DELAY);
+      return;
+    }
+
+    if (shouldStabilizeExpandedTarget(activeTop)) {
+      clearHoverState();
+      setIsSiblingDropActive(false);
       return;
     }
 
@@ -184,6 +211,10 @@ export function usePlannerDragAndDrop({
 
     const overPathId = String(event.over.id);
     const activeTop = event.active.rect.current.translated?.top;
+    if (shouldStabilizeExpandedTarget(activeTop)) {
+      resetDragState();
+      return;
+    }
     const isChildHover =
       activeTop !== undefined &&
       isPlannerChildHover({

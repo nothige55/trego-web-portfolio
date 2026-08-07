@@ -77,6 +77,25 @@ function calculateSiblingDestination(
   });
 }
 
+function findActiveSubtreeRange(
+  visibleItems: readonly FlattenedPlannerNode[],
+  activePathId: PlannerNodePathId,
+): Readonly<{ start: number; end: number }> | null {
+  const start = visibleItems.findIndex((item) => item.pathId === activePathId);
+  if (start < 0) {
+    return null;
+  }
+
+  const activeDepth = visibleItems[start].depth;
+  let end = start + 1;
+
+  while (end < visibleItems.length && visibleItems[end].depth > activeDepth) {
+    end += 1;
+  }
+
+  return { start, end };
+}
+
 function collectTrailingCandidates(
   tree: PlannerTree,
   previousItem: FlattenedPlannerNode,
@@ -130,22 +149,27 @@ export function removeActiveDescendants(
     return [...visibleItems];
   }
 
-  const activeIndex = visibleItems.findIndex((item) => item.pathId === activePathId);
-  if (activeIndex < 0) {
+  const range = findActiveSubtreeRange(visibleItems, activePathId);
+  if (!range) {
     return [...visibleItems];
   }
 
-  const activeDepth = visibleItems[activeIndex].depth;
-  let descendantEndIndex = activeIndex + 1;
+  return [...visibleItems.slice(0, range.start + 1), ...visibleItems.slice(range.end)];
+}
 
-  while (
-    descendantEndIndex < visibleItems.length &&
-    visibleItems[descendantEndIndex].depth > activeDepth
-  ) {
-    descendantEndIndex += 1;
+export function calculatePlannerDragFootprintHeight(
+  visibleItems: readonly FlattenedPlannerNode[],
+  activePathId: PlannerNodePathId,
+  getItemHeight: (pathId: PlannerNodePathId) => number,
+): number {
+  const range = findActiveSubtreeRange(visibleItems, activePathId);
+  if (!range || range.end === range.start + 1) {
+    return 0;
   }
 
-  return [...visibleItems.slice(0, activeIndex + 1), ...visibleItems.slice(descendantEndIndex)];
+  return visibleItems
+    .slice(range.start, range.end)
+    .reduce((height, item) => height + getItemHeight(item.pathId), 0);
 }
 
 export function resolvePlannerDrop({
@@ -210,6 +234,32 @@ export function resolvePlannerDrop({
         ? siblingIndexBefore(tree, nextItem.parentPathId, activePathId, nextItem.pathId)
         : null,
     );
+  }
+
+  // 기존 Planner는 activity의 trailing drop 계층을 인접 activity와 동일하게 고정한다.
+  // 따라서 group의 마지막 자식 뒤에서 X축 이동이 없을 때 상위 Day로 빠지지 않는다.
+  if (activeNode.kind === "activity") {
+    if (previousItem.kind === "activity" && previousItem.parentPathId) {
+      return calculateSiblingDestination(
+        tree,
+        rootPathId,
+        activePathId,
+        previousItem.parentPathId,
+        siblingIndexAfter(tree, previousItem.parentPathId, activePathId, previousItem.pathId),
+      );
+    }
+
+    if (nextItem?.kind === "activity" && nextItem.parentPathId) {
+      return calculateSiblingDestination(
+        tree,
+        rootPathId,
+        activePathId,
+        nextItem.parentPathId,
+        siblingIndexBefore(tree, nextItem.parentPathId, activePathId, nextItem.pathId),
+      );
+    }
+
+    return rejection("parent-not-found");
   }
 
   // branch 끝에서는 이전 행과 그 조상들의 "다음 형제"만 후보로 삼고 X축으로 계층을 고른다.

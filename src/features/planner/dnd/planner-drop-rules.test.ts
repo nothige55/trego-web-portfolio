@@ -217,6 +217,27 @@ describe("calculatePlannerDropDestination", () => {
     });
   });
 
+  it("creates a position before a zero-based first sibling", () => {
+    const tree = plannerTree([
+      flattened(folder("root", null, 0)),
+      flattened(folder("region", "root", 0.1), 1),
+      flattened(day("first", "region", 0), 2),
+      flattened(day("active", "region", 1), 2, 1),
+    ]);
+
+    expect(
+      calculatePlannerDropDestination(tree, {
+        rootPathId: "root",
+        activePathId: "active",
+        parentPathId: "region",
+        siblingIndex: 0,
+      }),
+    ).toEqual({
+      accepted: true,
+      destination: { parentPathId: "region", siblingIndex: 0, position: -0.1 },
+    });
+  });
+
   it("removes the active node before resolving a same-parent sibling index", () => {
     const tree = plannerTree([
       flattened(folder("root", null, 0)),

@@ -1,4 +1,10 @@
-import { closestCenter, DndContext, DragOverlay } from "@dnd-kit/core";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight, ListChevronsDownUp } from "lucide-react";
@@ -11,6 +17,7 @@ import {
 } from "@/features/planner/components/planner-breadcrumb";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
 import { demoPlannerProject } from "@/features/planner/data/demo-planner";
+import { calculatePlannerDragFootprintHeight } from "@/features/planner/dnd/resolve-planner-drop";
 import { usePlannerDragAndDrop } from "@/features/planner/dnd/use-planner-drag-and-drop";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type {
@@ -200,6 +207,7 @@ export function PlannerSchedulePanel() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<PlannerNodePathId, HTMLLIElement>());
   const [topItemId, setTopItemId] = useState<PlannerNodePathId | null>(null);
+  const [dragFootprintHeight, setDragFootprintHeight] = useState(0);
   const visibleItems = useMemo(
     () => getVisiblePlannerNodes(tree.flattenedItems, expandedIds, tree.childrenMap),
     [expandedIds, tree.childrenMap, tree.flattenedItems],
@@ -247,6 +255,25 @@ export function PlannerSchedulePanel() {
     moveNode,
     selectItem,
   });
+  const handlePanelDragStart = (event: DragStartEvent): void => {
+    const pathId = String(event.active.id);
+    setDragFootprintHeight(
+      calculatePlannerDragFootprintHeight(
+        renderedItems,
+        pathId,
+        (itemPathId) => itemRefs.current.get(itemPathId)?.offsetHeight ?? 0,
+      ),
+    );
+    handleDragStart(event);
+  };
+  const handlePanelDragEnd = (event: DragEndEvent): void => {
+    setDragFootprintHeight(0);
+    handleDragEnd(event);
+  };
+  const handlePanelDragCancel = (): void => {
+    setDragFootprintHeight(0);
+    handleDragCancel();
+  };
   const activeNode = activePathId ? tree.entityMap.get(activePathId) : undefined;
   const breadcrumbAncestors = useMemo(
     () => getPlannerBreadcrumbAncestors(topItemId, rootPathId, tree.entityMap),
@@ -355,10 +382,10 @@ export function PlannerSchedulePanel() {
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
-            onDragCancel={handleDragCancel}
-            onDragEnd={handleDragEnd}
+            onDragCancel={handlePanelDragCancel}
+            onDragEnd={handlePanelDragEnd}
             onDragMove={handleDragMove}
-            onDragStart={handleDragStart}
+            onDragStart={handlePanelDragStart}
           >
             <SortableContext items={sortableItems.map((node) => node.pathId)}>
               <ul
@@ -433,6 +460,11 @@ export function PlannerSchedulePanel() {
               </DragOverlay>
             ) : null}
           </DndContext>
+          <div
+            aria-hidden="true"
+            data-testid="planner-drag-footprint-spacer"
+            style={{ height: dragFootprintHeight }}
+          />
         </div>
       </div>
     </aside>
