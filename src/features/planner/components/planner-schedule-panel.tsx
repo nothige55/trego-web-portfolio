@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, ListChevronsDownUp } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { DayMapVisibilityToggle } from "@/features/planner/components/day-map-visibility-toggle";
 import {
   PLANNER_BREADCRUMB_HEIGHT,
   PlannerBreadcrumb,
@@ -152,6 +153,9 @@ function PlannerTreeItem({
             ) : null
           }
         />
+        {node.kind === "day" ? (
+          <DayMapVisibilityToggle dayPathId={node.pathId} dayName={node.name} />
+        ) : null}
       </div>
     </li>
   );

@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import App from "@/app/app";
 import { router } from "@/app/router";
 import { render, screen } from "@/testing/test-utils";
+
+vi.mock("@/features/planner/components/planner-map", () => ({
+  PlannerMap: () => <section aria-label="지도 영역" />,
+}));
 
 describe("App", () => {
   it("renders the root route", async () => {
