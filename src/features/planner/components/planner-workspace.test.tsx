@@ -11,7 +11,7 @@ vi.mock("@/features/planner/components/planner-map", () => ({
     const setModuleCollapsed = usePlannerViewStore((state) => state.setModuleCollapsed);
 
     return (
-      <section aria-label="지도 영역">
+      <section aria-label="지도 영역" data-testid="planner-map-mock">
         {isModuleCollapsed ? (
           <button
             type="button"
@@ -38,6 +38,7 @@ describe("PlannerWorkspace", () => {
     const user = userEvent.setup();
     render(<PlannerWorkspace projectId="demo" />);
     await screen.findByRole("main", { name: "여행 일정 플래너" });
+    await screen.findByTestId("planner-map-mock");
     return user;
   }
 

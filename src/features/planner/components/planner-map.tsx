@@ -2,7 +2,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 import { ChevronRight, MapPinned, Scan } from "lucide-react";
 import mapboxgl, { type GeoJSONSource, type Map as MapboxMap } from "mapbox-gl";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { env } from "@/config/env";
@@ -27,6 +27,9 @@ const ROUTE_SOURCE_ID = "planner-routes";
 const ROUTE_BORDER_LAYER_ID = "planner-route-borders";
 const ROUTE_LAYER_ID = "planner-route-lines";
 const MARKER_PIN_RADIUS = 16;
+const MAP_LOAD_TIMEOUT_MS = 10_000;
+
+type MapLoadState = "loading" | "ready" | "error";
 
 type RenderedMarker = {
   readonly marker: mapboxgl.Marker;
@@ -257,6 +260,8 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
   const resolvedAccessToken = accessToken === undefined ? env.mapboxAccessToken : accessToken;
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
+  const [mapLoadState, setMapLoadState] = useState<MapLoadState>("loading");
+  const [retryCount, setRetryCount] = useState(0);
   const isLoadedRef = useRef(false);
   const hasAppliedInitialCameraRef = useRef(false);
   const lastFocusRevisionRef = useRef(-1);
@@ -279,20 +284,51 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
       return;
     }
 
-    const map = new mapboxgl.Map({
-      accessToken: resolvedAccessToken,
-      container,
-      style: MAP_STYLE,
-      config: { basemap: { lightPreset: "day" } },
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-    });
+    setMapLoadState("loading");
+    let map: MapboxMap;
+    try {
+      map = new mapboxgl.Map({
+        accessToken: resolvedAccessToken,
+        container,
+        style: MAP_STYLE,
+        config: { basemap: { lightPreset: "day" } },
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+      });
+    } catch {
+      const constructorErrorTimeoutId = window.setTimeout(() => {
+        setMapLoadState("error");
+      }, 0);
+      return () => {
+        window.clearTimeout(constructorErrorTimeoutId);
+      };
+    }
+
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
     const renderedMarkers = renderedMarkersRef.current;
     mapRef.current = map;
+    let isDisposed = false;
+    let hasInitialLoadFailed = false;
+    let loadTimeoutId = window.setTimeout(() => {
+      if (!isDisposed && !isLoadedRef.current) {
+        hasInitialLoadFailed = true;
+        setMapLoadState("error");
+      }
+    }, MAP_LOAD_TIMEOUT_MS);
+
+    const clearLoadTimeout = () => {
+      window.clearTimeout(loadTimeoutId);
+      loadTimeoutId = 0;
+    };
 
     const handleLoad = () => {
+      if (hasInitialLoadFailed) {
+        return;
+      }
+
+      clearLoadTimeout();
       isLoadedRef.current = true;
+      setMapLoadState("ready");
       addRouteLayers(map);
       syncRoutes(map, mapModelRef.current.routes);
       syncMarkers({
@@ -307,7 +343,18 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
       lastFocusRevisionRef.current = selectionRevisionRef.current;
     };
 
+    const handleError = () => {
+      if (isLoadedRef.current || hasInitialLoadFailed) {
+        return;
+      }
+
+      clearLoadTimeout();
+      hasInitialLoadFailed = true;
+      setMapLoadState("error");
+    };
+
     map.on("load", handleLoad);
+    map.on("error", handleError);
 
     const resizeObserver =
       typeof ResizeObserver === "undefined"
@@ -318,6 +365,8 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
     resizeObserver?.observe(container);
 
     return () => {
+      isDisposed = true;
+      clearLoadTimeout();
       resizeObserver?.disconnect();
       renderedMarkers.forEach(({ marker }) => {
         marker.remove();
@@ -329,7 +378,7 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
       hasAppliedInitialCameraRef.current = false;
       lastFocusRevisionRef.current = -1;
     };
-  }, [resolvedAccessToken]);
+  }, [resolvedAccessToken, retryCount]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -375,7 +424,39 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
           </div>
         </div>
       )}
-      {resolvedAccessToken ? (
+      {resolvedAccessToken && mapLoadState === "loading" ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#eef1f3]/85 p-8">
+          <p role="status" className="text-sm font-medium text-muted-foreground">
+            지도를 불러오는 중입니다
+          </p>
+        </div>
+      ) : null}
+      {resolvedAccessToken && mapLoadState === "error" ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#eef1f3]/95 p-8">
+          <div
+            role="alert"
+            className="max-w-sm rounded-xl border bg-card p-5 text-center shadow-sm"
+          >
+            <MapPinned aria-hidden="true" className="mx-auto mb-3 size-7 text-brand" />
+            <p className="font-semibold">지도를 불러오지 못했습니다</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              토큰과 네트워크 연결을 확인한 뒤 다시 시도해 주세요.
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-4"
+              onClick={() => {
+                setMapLoadState("loading");
+                setRetryCount((count) => count + 1);
+              }}
+            >
+              지도 다시 시도
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {resolvedAccessToken && mapLoadState === "ready" ? (
         <div className="absolute top-3 right-12 z-10">
           <Button
             type="button"

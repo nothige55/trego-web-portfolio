@@ -129,6 +129,7 @@ describe("PlannerMap", () => {
   afterEach(() => {
     usePlannerMapStore.getState().reset();
     usePlannerViewStore.getState().reset();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     resizeCallback = undefined;
   });
@@ -137,6 +138,7 @@ describe("PlannerMap", () => {
     render(<PlannerMap accessToken={null} />);
 
     expect(screen.getByText("Mapbox 토큰이 필요합니다")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(mapboxMocks.mapConstructor).not.toHaveBeenCalled();
   });
 
@@ -151,11 +153,13 @@ describe("PlannerMap", () => {
     expect(mapboxMocks.navigationControlConstructor).toHaveBeenCalledWith({
       visualizePitch: true,
     });
+    expect(screen.getByRole("status")).toHaveTextContent("지도를 불러오는 중입니다");
 
     act(() => {
       map.trigger("load");
     });
 
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(map.addSource).toHaveBeenCalledWith(
       "planner-routes",
       expect.objectContaining({ type: "geojson" }),
@@ -190,6 +194,52 @@ describe("PlannerMap", () => {
     expect(mapboxMocks.markerInstances.every((marker) => marker.remove.mock.calls.length > 0)).toBe(
       true,
     );
+  });
+
+  it("keeps Planner state while retrying a failed initial map load", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().selectItem("day-one-airport");
+    render(<PlannerMap accessToken="pk.test" />);
+    const firstMap = mapboxMocks.mapInstances[0];
+
+    act(() => {
+      firstMap.trigger("error");
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("지도를 불러오지 못했습니다");
+    expect(screen.queryByRole("button", { name: "전체 일정 보기" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "지도 다시 시도" }));
+
+    expect(firstMap.remove).toHaveBeenCalledTimes(1);
+    expect(mapboxMocks.mapConstructor).toHaveBeenCalledTimes(2);
+    expect(usePlannerViewStore.getState().selectedItemId).toBe("day-one-airport");
+    expect(screen.getByRole("status")).toHaveTextContent("지도를 불러오는 중입니다");
+
+    const retriedMap = mapboxMocks.mapInstances[1];
+    act(() => {
+      retriedMap.trigger("load");
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "전체 일정 보기" })).toBeInTheDocument();
+    expect(retriedMap.easeTo).toHaveBeenCalledWith(
+      expect.objectContaining({ center: [126.4914, 33.5104] }),
+    );
+  });
+
+  it("offers retry when the initial map load times out", () => {
+    vi.useFakeTimers();
+    const { unmount } = render(<PlannerMap accessToken="pk.test" />);
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("지도를 불러오지 못했습니다");
+    expect(screen.getByRole("button", { name: "지도 다시 시도" })).toBeInTheDocument();
+
+    unmount();
   });
 
   it("focuses places, Day bounds, and a selected hidden Day without moving for root or Shift selection", () => {
