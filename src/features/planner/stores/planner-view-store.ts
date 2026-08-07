@@ -19,6 +19,7 @@ type PlannerViewState = {
   readonly rootPathId: PlannerNodePathId | null;
   readonly expandedIds: ReadonlySet<PlannerNodePathId>;
   readonly selectedItemId: PlannerNodePathId | null;
+  readonly selectionRevision: number;
   readonly multiSelectedIds: readonly PlannerNodePathId[];
   readonly selectionRangeIds: readonly PlannerNodePathId[];
   readonly activeModule: PlannerModule;
@@ -53,6 +54,7 @@ function createInitialState(): PlannerViewState {
     rootPathId: null,
     expandedIds: new Set(),
     selectedItemId: null,
+    selectionRevision: 0,
     multiSelectedIds: [],
     selectionRangeIds: [],
     activeModule: "explore",
@@ -72,6 +74,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
       rootPathId: rootNode?.pathId ?? null,
       expandedIds: new Set(rootNode ? [rootNode.pathId] : []),
       selectedItemId: null,
+      selectionRevision: 0,
       multiSelectedIds: [],
       selectionRangeIds: [],
     });
@@ -115,13 +118,23 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
     }
 
     if (!extendSelection || !state.selectedItemId) {
-      set({ selectedItemId: pathId, multiSelectedIds: [], selectionRangeIds: [] });
+      set({
+        selectedItemId: pathId,
+        selectionRevision: state.selectionRevision + 1,
+        multiSelectedIds: [],
+        selectionRangeIds: [],
+      });
       return;
     }
 
     const lastSelectedItem = state.tree.entityMap.get(state.selectedItemId);
     if (!lastSelectedItem) {
-      set({ selectedItemId: pathId, multiSelectedIds: [], selectionRangeIds: [] });
+      set({
+        selectedItemId: pathId,
+        selectionRevision: state.selectionRevision + 1,
+        multiSelectedIds: [],
+        selectionRangeIds: [],
+      });
       return;
     }
 

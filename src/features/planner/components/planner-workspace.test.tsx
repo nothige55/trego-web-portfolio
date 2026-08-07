@@ -1,12 +1,36 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
+import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import { fireEvent, render, screen, userEvent, within } from "@/testing/test-utils";
+
+vi.mock("@/features/planner/components/planner-map", () => ({
+  PlannerMap: () => {
+    const isModuleCollapsed = usePlannerViewStore((state) => state.isModuleCollapsed);
+    const setModuleCollapsed = usePlannerViewStore((state) => state.setModuleCollapsed);
+
+    return (
+      <section aria-label="지도 영역">
+        {isModuleCollapsed ? (
+          <button
+            type="button"
+            onClick={() => {
+              setModuleCollapsed(false);
+            }}
+          >
+            패널 열기
+          </button>
+        ) : null}
+      </section>
+    );
+  },
+}));
 
 // 실제 Maps나 API 없이 사용자가 확인할 수 있는 Planner shell의 동작만 검증한다.
 describe("PlannerWorkspace", () => {
   afterEach(() => {
+    usePlannerMapStore.getState().reset();
     usePlannerViewStore.getState().reset();
   });
 
@@ -41,6 +65,22 @@ describe("PlannerWorkspace", () => {
     expect(screen.getByRole("complementary", { name: "Planner 보조 패널" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "지도 영역" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "제주도 7일 여행" })).toBeInTheDocument();
+  });
+
+  it("toggles Day map visibility without selecting the row", async () => {
+    const user = await renderPlanner();
+    const tree = screen.getByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    const dayRow = within(tree).getByText("8월 12일").closest("[role=treeitem]");
+
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 지도에서 숨기기" }));
+
+    expect(usePlannerMapStore.getState().hiddenDayIds).toContain("day-one");
+    expect(dayRow).toHaveAttribute("aria-selected", "false");
+    expect(
+      within(tree).getByRole("button", { name: "8월 12일 지도에 표시하기" }),
+    ).toBeInTheDocument();
   });
 
   it("expands a branch, selects a range, and clears the selection from empty space", async () => {

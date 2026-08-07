@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 
-import { PlannerMapPlaceholder } from "@/features/planner/components/planner-map-placeholder";
+import { PlannerMap } from "@/features/planner/components/planner-map";
 import { PlannerModulePanel } from "@/features/planner/components/planner-module-panel";
 import { PlannerSchedulePanel } from "@/features/planner/components/planner-schedule-panel";
 import { demoPlannerProject } from "@/features/planner/data/demo-planner";
+import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 
 type PlannerWorkspaceProps = {
@@ -15,17 +16,20 @@ type PlannerWorkspaceProps = {
 export function PlannerWorkspace({ projectId }: PlannerWorkspaceProps) {
   const load = usePlannerViewStore((state) => state.load);
   const reset = usePlannerViewStore((state) => state.reset);
+  const resetMap = usePlannerMapStore((state) => state.reset);
   const isModuleCollapsed = usePlannerViewStore((state) => state.isModuleCollapsed);
 
   useEffect(() => {
     // 실제 API가 연결되기 전에는 동일 fixture로 UI와 탐색 상태를 결정론적으로 검증한다.
+    resetMap();
     load(demoPlannerProject.nodes);
 
     return () => {
       // 다른 프로젝트나 route로 이동할 때 이전 선택과 펼침 상태가 남지 않게 한다.
       reset();
+      resetMap();
     };
-  }, [load, projectId, reset]);
+  }, [load, projectId, reset, resetMap]);
 
   return (
     <main
@@ -36,7 +40,7 @@ export function PlannerWorkspace({ projectId }: PlannerWorkspaceProps) {
       <PlannerSchedulePanel />
       {/* 접힌 패널은 DOM에서도 제거해 남은 공간을 지도 영역이 모두 사용하게 한다. */}
       {isModuleCollapsed ? null : <PlannerModulePanel />}
-      <PlannerMapPlaceholder />
+      <PlannerMap />
     </main>
   );
 }

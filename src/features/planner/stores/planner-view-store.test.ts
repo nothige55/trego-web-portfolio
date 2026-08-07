@@ -57,6 +57,20 @@ describe("usePlannerViewStore", () => {
     expect(usePlannerViewStore.getState().selectionRangeIds).toEqual([]);
   });
 
+  it("increments the selection revision for repeated single selection but not Shift selection", () => {
+    const store = usePlannerViewStore.getState();
+    store.load(demoPlannerProject.nodes);
+
+    store.selectItem("day-one-airport");
+    expect(usePlannerViewStore.getState().selectionRevision).toBe(1);
+
+    store.selectItem("day-one-airport");
+    expect(usePlannerViewStore.getState().selectionRevision).toBe(2);
+
+    store.selectItem("day-one-iho", true);
+    expect(usePlannerViewStore.getState().selectionRevision).toBe(2);
+  });
+
   it("normalizes only the nodes visible between the shift-selection endpoints", () => {
     const store = usePlannerViewStore.getState();
     store.load(demoPlannerProject.nodes);

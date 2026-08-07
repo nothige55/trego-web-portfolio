@@ -22,6 +22,12 @@ export function parseApiBaseUrl(value: string | undefined): string | undefined {
   return baseUrl.replace(/\/+$/, "");
 }
 
+export function parseMapboxAccessToken(value: string | undefined): string | undefined {
+  const accessToken = value?.trim();
+  return accessToken || undefined;
+}
+
 export const env = Object.freeze({
   apiBaseUrl: parseApiBaseUrl(import.meta.env.VITE_API_BASE_URL),
+  mapboxAccessToken: parseMapboxAccessToken(import.meta.env.VITE_MAPBOX_ACCESS_TOKEN),
 });
