@@ -149,6 +149,10 @@ describe("usePlannerDragAndDrop", () => {
       siblingIndex: 0,
       position: 0.1,
     });
+    expect(expandNode).toHaveBeenCalledWith("wish");
+    expect(moveNode.mock.invocationCallOrder[0]).toBeLessThan(
+      expandNode.mock.invocationCallOrder[0],
+    );
   });
 
   it("expands a collapsed container with children after one second", () => {

@@ -12,10 +12,11 @@ type DemoActivityInput = {
   readonly pathId: string;
   readonly parentPathId: string;
   readonly position: number;
-  readonly placeId: number;
-  readonly latitude: number;
-  readonly longitude: number;
-  readonly startTime: string | null;
+  readonly activityType?: "group" | "single";
+  readonly placeId?: number | null;
+  readonly latitude?: number | null;
+  readonly longitude?: number | null;
+  readonly startTime?: string | null;
   readonly memo?: string | null;
   readonly markerType?: string | null;
   readonly travelMode?: string | null;
@@ -29,10 +30,11 @@ function createActivity({
   pathId,
   parentPathId,
   position,
-  placeId,
-  latitude,
-  longitude,
-  startTime,
+  activityType = "single",
+  placeId = null,
+  latitude = null,
+  longitude = null,
+  startTime = null,
   memo = null,
   markerType = "default",
   travelMode = null,
@@ -46,7 +48,7 @@ function createActivity({
     pathId,
     parentPathId,
     position,
-    activityType: "place",
+    activityType,
     memo,
     markerType,
     travelMode,
@@ -58,7 +60,7 @@ function createActivity({
     placeId,
     latitude,
     longitude,
-    googlePlaceId: `demo-${pathId}`,
+    googlePlaceId: placeId === null ? null : `demo-${pathId}`,
   };
 }
 
@@ -123,6 +125,17 @@ export const demoPlannerProject: DemoPlannerProject = {
       startTime: null,
       memo: "등산 예약과 장비 준비 필요",
     }),
+    // 일반 빈 폴더는 트리에서 제거되므로, 빈 자식 드롭을 검증할 수 있는 wish를 둔다.
+    {
+      id: "demo-empty-wish",
+      kind: "folder",
+      name: "빈 위시리스트",
+      pathId: "empty-wish",
+      parentPathId: "root",
+      position: 2.5,
+      color: "#EC4899",
+      folderType: "wish",
+    },
     // 지역 폴더 아래에 Day를 두어 root → 지역 → 날짜 → 장소의 깊은 계층을 확인한다.
     {
       id: "demo-region-jeju",
@@ -586,6 +599,30 @@ export const demoPlannerProject: DemoPlannerProject = {
       travelMode: "car",
       travelTime: 30,
       travelDistance: 24.6,
+    }),
+
+    // 루트 직속 Day에서 빈 group 진입과 single 자식 이동을 독립적으로 확인한다.
+    {
+      id: "demo-dnd-test-day",
+      kind: "day",
+      name: "DnD 테스트 Day",
+      pathId: "dnd-test-day",
+      parentPathId: "root",
+      position: 3,
+      color: "#0D99FF",
+    },
+    createActivity({
+      name: "빈 그룹",
+      pathId: "dnd-empty-group",
+      parentPathId: "dnd-test-day",
+      position: 0,
+      activityType: "group",
+    }),
+    createActivity({
+      name: "단일 장소",
+      pathId: "dnd-single-activity",
+      parentPathId: "dnd-test-day",
+      position: 1,
     }),
   ],
 };

@@ -222,27 +222,31 @@ export function usePlannerDragAndDrop({
         activeTop,
         deltaY: event.delta.y,
       });
-    const result =
-      readyChildTargetPathIdRef.current === overPathId && isChildHover
-        ? calculatePlannerDropDestination(tree, {
-            rootPathId,
-            activePathId,
-            parentPathId: overPathId,
-            siblingIndex: (tree.childrenMap.get(overPathId) ?? []).filter(
-              (node) => node.pathId !== activePathId,
-            ).length,
-          })
-        : resolvePlannerDrop({
-            tree,
-            rootPathId,
-            visibleItems: sortableItems,
-            activePathId,
-            overPathId,
-            horizontalOffset,
-          });
+    const isReadyEmptyChildDrop = readyChildTargetPathIdRef.current === overPathId && isChildHover;
+    const result = isReadyEmptyChildDrop
+      ? calculatePlannerDropDestination(tree, {
+          rootPathId,
+          activePathId,
+          parentPathId: overPathId,
+          siblingIndex: (tree.childrenMap.get(overPathId) ?? []).filter(
+            (node) => node.pathId !== activePathId,
+          ).length,
+        })
+      : resolvePlannerDrop({
+          tree,
+          rootPathId,
+          visibleItems: sortableItems,
+          activePathId,
+          overPathId,
+          horizontalOffset,
+        });
 
     if (result.accepted) {
       moveNode(activePathId, result.destination);
+      if (isReadyEmptyChildDrop) {
+        // 빈 대상은 이동 전에는 펼칠 자식이 없으므로, 트리 갱신 뒤에 펼친다.
+        expandNode(result.destination.parentPathId);
+      }
     }
 
     resetDragState();
