@@ -7,6 +7,7 @@
 - React 19, TypeScript, Vite
 - React Router
 - Tailwind CSS v4, shadcn/ui
+- Mapbox GL JS
 - Vitest, React Testing Library
 
 ## 시작하기
@@ -21,11 +22,14 @@ npm run dev
 
 ## 환경변수
 
-| 이름                | 필수 여부 | 설명                                                       |
-| ------------------- | --------- | ---------------------------------------------------------- |
-| `VITE_API_BASE_URL` | 선택      | REST API 기준 URL. 비워두면 현재 origin의 상대 경로를 사용 |
+| 이름                       | 필수 여부   | 설명                                                       |
+| -------------------------- | ----------- | ---------------------------------------------------------- |
+| `VITE_API_BASE_URL`        | 선택        | REST API 기준 URL. 비워두면 현재 origin의 상대 경로를 사용 |
+| `VITE_MAPBOX_ACCESS_TOKEN` | 지도에 필수 | Planner 지도를 렌더링하는 Mapbox public access token       |
 
 환경변수는 `src/config`에서 검증하고 정규화합니다. API 주소를 지정한다면 `http` 또는 `https` 절대 URL을 사용해야 합니다. 개발 환경에서 값을 비워두면 Vite가 `/api` 요청을 기존 백엔드 주소인 `http://localhost:3000`으로 전달합니다.
+
+Mapbox token이 없어도 Planner의 일정 UI는 사용할 수 있으며, 지도 영역에는 설정 안내가 표시됩니다. token은 `.env.local`에만 저장하고 Git에 커밋하지 않습니다.
 
 ## 주요 명령어
 

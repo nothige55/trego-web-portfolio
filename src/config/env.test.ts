@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseApiBaseUrl } from "@/config/env";
+import { parseApiBaseUrl, parseMapboxAccessToken } from "@/config/env";
 
 describe("parseApiBaseUrl", () => {
   it("uses relative requests when the value is missing", () => {
@@ -19,5 +19,16 @@ describe("parseApiBaseUrl", () => {
     expect(() => parseApiBaseUrl("ftp://api.example.com")).toThrow(
       "VITE_API_BASE_URL must use the http or https protocol.",
     );
+  });
+});
+
+describe("parseMapboxAccessToken", () => {
+  it("normalizes a configured public token", () => {
+    expect(parseMapboxAccessToken(" pk.example ")).toBe("pk.example");
+  });
+
+  it("keeps the map optional when no token is configured", () => {
+    expect(parseMapboxAccessToken(undefined)).toBeUndefined();
+    expect(parseMapboxAccessToken("  ")).toBeUndefined();
   });
 });
