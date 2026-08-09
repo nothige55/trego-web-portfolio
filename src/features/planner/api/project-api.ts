@@ -5,14 +5,11 @@ import type { ApiClient } from "@/lib/api-client";
 import { apiClient } from "@/lib/api-client";
 
 export interface ProjectNodeResponse {
-  readonly folderId?: string | null;
-  readonly folderName?: string | null;
+  readonly kind: "activity" | "day" | "folder";
+  readonly id: string;
+  readonly name: string;
   readonly folderType?: string | null;
-  readonly dayId?: string | null;
-  readonly dayName?: string | null;
   readonly color?: string | null;
-  readonly activityId?: string | null;
-  readonly activityName?: string | null;
   readonly memo?: string | null;
   readonly activityType?: string | null;
   readonly markerType?: string | null;
@@ -23,12 +20,12 @@ export interface ProjectNodeResponse {
   readonly startTime?: string | null;
   readonly endTime?: string | null;
   readonly placeId?: number | null;
-  readonly lat?: number | null;
-  readonly lng?: number | null;
-  readonly googleId?: string | null;
+  readonly latitude?: number | null;
+  readonly longitude?: number | null;
+  readonly googlePlaceId?: string | null;
   readonly pathId: string;
   readonly position: number;
-  readonly parentPathId: string;
+  readonly parentPathId: string | null;
 }
 
 interface ProjectDetailsResponse extends PlannerProjectDetails {
@@ -46,33 +43,33 @@ export function normalizeProjectNode(node: ProjectNodeResponse): PlannerNode {
     position: node.position,
   };
 
-  if (node.folderId) {
+  if (node.kind === "folder") {
     return {
       ...base,
       kind: "folder",
-      id: node.folderId,
-      name: node.folderName ?? "이름 없는 폴더",
+      id: node.id,
+      name: node.name,
       folderType: node.folderType ?? null,
       color: node.color ?? null,
     };
   }
 
-  if (node.dayId) {
+  if (node.kind === "day") {
     return {
       ...base,
       kind: "day",
-      id: node.dayId,
-      name: node.dayName ?? "이름 없는 날짜",
+      id: node.id,
+      name: node.name,
       color: node.color ?? null,
     };
   }
 
-  if (node.activityId) {
+  if (node.kind === "activity") {
     return {
       ...base,
       kind: "activity",
-      id: node.activityId,
-      name: node.activityName ?? "이름 없는 장소",
+      id: node.id,
+      name: node.name,
       activityType: node.activityType ?? null,
       memo: node.memo ?? null,
       markerType: node.markerType ?? null,
@@ -83,13 +80,13 @@ export function normalizeProjectNode(node: ProjectNodeResponse): PlannerNode {
       startTime: node.startTime ?? null,
       endTime: node.endTime ?? null,
       placeId: node.placeId ?? null,
-      latitude: node.lat ?? null,
-      longitude: node.lng ?? null,
-      googlePlaceId: node.googleId ?? null,
+      latitude: node.latitude ?? null,
+      longitude: node.longitude ?? null,
+      googlePlaceId: node.googlePlaceId ?? null,
     };
   }
 
-  throw new TypeError(`Project node ${node.pathId} has no supported entity id.`);
+  throw new TypeError(`Project node ${node.pathId} has an unsupported kind.`);
 }
 
 export async function getProjectDetails(
@@ -112,7 +109,7 @@ export async function getProjectNodes(
   client: Pick<ApiClient, "get"> = apiClient,
 ): Promise<readonly PlannerNode[]> {
   const response = await client.get<readonly ProjectNodeResponse[]>(
-    `/api/projects/${projectId}/nodes`,
+    `/api/v2/projects/${projectId}/nodes`,
   );
 
   return response.map(normalizeProjectNode);

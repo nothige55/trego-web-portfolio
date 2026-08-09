@@ -51,11 +51,12 @@ function createRestClient() {
     if (url.endsWith("/nodes")) {
       return [
         {
-          folderId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-          folderName: "Live project",
+          kind: "folder",
+          id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          name: "Live project",
           folderType: "root",
           pathId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-          parentPathId: "00000000-0000-0000-0000-000000000000",
+          parentPathId: null,
           position: 0,
         },
       ];
@@ -114,7 +115,9 @@ describe("PlannerRealtimeDemo", () => {
       "JoinProject",
       "33333333-3333-3333-3333-333333333333",
     );
-    expect(rest.get).toHaveBeenCalledTimes(3);
+    expect(rest.get).toHaveBeenCalledWith(
+      "/api/projects/33333333-3333-3333-3333-333333333333/messages",
+    );
 
     await user.click(screen.getByRole("button", { name: "채팅" }));
     expect(await screen.findByText("REST history")).toBeInTheDocument();
@@ -155,6 +158,34 @@ describe("PlannerRealtimeDemo", () => {
         0.5,
         0.5,
       ),
+    );
+  });
+
+  it("loads REST chat history even when the realtime connection fails", async () => {
+    const signalR = createFakeSignalRClient();
+    signalR.client.start = vi.fn().mockRejectedValue(new Error("offline"));
+    const rest = createRestClient();
+
+    render(
+      <PlannerRealtimeDemo
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "11111111-1111-1111-1111-111111111111",
+          name: "One",
+        }}
+        onLogout={vi.fn()}
+        projectId="33333333-3333-3333-3333-333333333333"
+        restClient={rest.client}
+      />,
+    );
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "채팅" }));
+
+    expect(await screen.findByText("REST history")).toBeInTheDocument();
+    expect(rest.get).toHaveBeenCalledWith(
+      "/api/projects/33333333-3333-3333-3333-333333333333/messages",
     );
   });
 });

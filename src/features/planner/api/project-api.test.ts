@@ -5,18 +5,18 @@ import {
   getProjectNodes,
   normalizeProjectNode,
 } from "@/features/planner/api/project-api";
-import { EMPTY_GUID } from "@/features/planner/realtime/project-hub-planner-contracts";
 import type { ApiClient } from "@/lib/api-client";
 
 describe("planner project API", () => {
-  it("normalizes the legacy REST node shape into the planner domain", () => {
+  it("normalizes the v2 REST node shape into the planner domain", () => {
     expect(
       normalizeProjectNode({
-        folderId: "folder-id",
-        folderName: "Root",
+        kind: "folder",
+        id: "folder-id",
+        name: "Root",
         folderType: "root",
         pathId: "path-id",
-        parentPathId: EMPTY_GUID,
+        parentPathId: null,
         position: 0,
       }),
     ).toEqual({
@@ -43,11 +43,12 @@ describe("planner project API", () => {
       })
       .mockResolvedValueOnce([
         {
-          dayId: "day-id",
-          dayName: "첫날",
+          kind: "day",
+          id: "day-id",
+          name: "첫날",
           color: "#fff",
           pathId: "day-path",
-          parentPathId: EMPTY_GUID,
+          parentPathId: null,
           position: 0,
         },
       ]);
@@ -61,6 +62,6 @@ describe("planner project API", () => {
       { kind: "day", id: "day-id", parentPathId: null },
     ]);
     expect(get).toHaveBeenNthCalledWith(1, "/api/projects/project-id");
-    expect(get).toHaveBeenNthCalledWith(2, "/api/projects/project-id/nodes");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/v2/projects/project-id/nodes");
   });
 });

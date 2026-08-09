@@ -1,5 +1,5 @@
-import { Send, UserRound } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { LoaderCircle, Send, UserPlus, UserRound } from "lucide-react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { ChatMessage, SendChatMessageResult } from "@/features/chat";
@@ -7,9 +7,12 @@ import type { ChatMessage, SendChatMessageResult } from "@/features/chat";
 type RealtimeChatPanelProps = {
   readonly currentUserId: string;
   readonly currentUserName: string;
+  readonly historyStatus?: "error" | "loading" | "ready";
   readonly isReady: boolean;
+  readonly memberInviteContent?: ReactNode;
   readonly messages: readonly ChatMessage[];
   readonly onLogout: () => void;
+  readonly onRetryHistory?: () => void;
   readonly onSend: (content: string) => Promise<SendChatMessageResult>;
 };
 
@@ -27,12 +30,16 @@ function formatMessageTime(value: string): string {
 export function RealtimeChatPanel({
   currentUserId,
   currentUserName,
+  historyStatus = "ready",
   isReady,
+  memberInviteContent,
   messages,
   onLogout,
+  onRetryHistory,
   onSend,
 }: RealtimeChatPanelProps) {
   const [draft, setDraft] = useState("");
+  const [isMemberInviteOpen, setIsMemberInviteOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const sortedMessages = useMemo(
@@ -62,19 +69,55 @@ export function RealtimeChatPanel({
   }
 
   return (
-    <section aria-label="프로젝트 실시간 채팅" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between gap-3 border-b px-1 pb-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{currentUserName}</p>
-          <p className="truncate text-xs text-muted-foreground">{currentUserId}</p>
+    <section aria-label="프로젝트 실시간 채팅" className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 items-center justify-between gap-2 border-b px-1 pb-3">
+        <p className="min-w-0 truncate text-sm font-semibold">{currentUserName}</p>
+        <div className="flex shrink-0 items-center gap-1">
+          {memberInviteContent ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-expanded={isMemberInviteOpen}
+              onClick={() => setIsMemberInviteOpen((isOpen) => !isOpen)}
+            >
+              <UserPlus aria-hidden="true" className="size-4" />
+              멤버 추가
+            </Button>
+          ) : null}
+          <Button type="button" variant="ghost" size="sm" onClick={onLogout}>
+            로그아웃
+          </Button>
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={onLogout}>
-          테스트 로그아웃
-        </Button>
       </div>
+      {isMemberInviteOpen ? memberInviteContent : null}
 
       <div aria-live="polite" className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4">
-        {sortedMessages.length === 0 ? (
+        {historyStatus === "loading" && sortedMessages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+            <LoaderCircle aria-hidden="true" className="size-7 animate-spin text-brand" />
+            <p className="mt-3 text-sm font-medium">채팅 내역을 불러오는 중입니다</p>
+          </div>
+        ) : historyStatus === "error" && sortedMessages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+            <UserRound aria-hidden="true" className="size-7 text-destructive" />
+            <p className="mt-3 text-sm font-medium">채팅 내역을 불러오지 못했습니다</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              로그인 상태와 백엔드 연결을 확인한 뒤 다시 시도해 주세요.
+            </p>
+            {onRetryHistory ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={onRetryHistory}
+              >
+                내역 다시 불러오기
+              </Button>
+            ) : null}
+          </div>
+        ) : sortedMessages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
             <UserRound aria-hidden="true" className="size-7 text-brand" />
             <p className="mt-3 text-sm font-medium">아직 메시지가 없습니다</p>
@@ -92,10 +135,10 @@ export function RealtimeChatPanel({
                 className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}
               >
                 <p className="mb-1 px-1 text-[11px] text-muted-foreground">
-                  {isMine ? "나" : (message.memberName ?? message.memberId.slice(0, 8))}
+                  {isMine ? "나" : (message.memberName ?? "프로젝트 멤버")}
                 </p>
                 <div
-                  className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm leading-5 break-words ${
+                  className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm leading-5 [overflow-wrap:anywhere] ${
                     isMine
                       ? "rounded-br-md bg-brand text-brand-foreground"
                       : "rounded-bl-md bg-muted text-foreground"
