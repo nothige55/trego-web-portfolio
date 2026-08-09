@@ -21,7 +21,7 @@ type PlannerViewState = {
   readonly rootPathId: PlannerNodePathId | null;
   readonly expandedIds: ReadonlySet<PlannerNodePathId>;
   readonly selectedItemId: PlannerNodePathId | null;
-  readonly selectionRevision: number;
+  readonly mapFocusRequest: Readonly<{ pathId: PlannerNodePathId }> | null;
   readonly multiSelectedIds: readonly PlannerNodePathId[];
   readonly selectionRangeIds: readonly PlannerNodePathId[];
   readonly activeModule: PlannerModule;
@@ -35,6 +35,7 @@ type PlannerViewActions = {
   expandNode: (pathId: PlannerNodePathId) => void;
   collapseAll: () => void;
   moveNode: (pathId: PlannerNodePathId, destination: Readonly<PlannerDropDestination>) => void;
+  activateItem: (pathId: PlannerNodePathId) => void;
   selectItem: (pathId: PlannerNodePathId, extendSelection?: boolean) => void;
   clearSelection: () => void;
   setActiveModule: (module: PlannerModule) => void;
@@ -58,7 +59,7 @@ function createInitialState(): PlannerViewState {
     rootPathId: null,
     expandedIds: new Set(),
     selectedItemId: null,
-    selectionRevision: 0,
+    mapFocusRequest: null,
     multiSelectedIds: [],
     selectionRangeIds: [],
     activeModule: "explore",
@@ -78,7 +79,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
       rootPathId: rootNode?.pathId ?? null,
       expandedIds: new Set(rootNode ? [rootNode.pathId] : []),
       selectedItemId: null,
-      selectionRevision: 0,
+      mapFocusRequest: null,
       multiSelectedIds: [],
       selectionRangeIds: [],
     });
@@ -139,9 +140,24 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
     set((state) => ({
       tree: applyPlannerDrop(state.tree, pathId, destination),
       selectedItemId: pathId,
+      mapFocusRequest: null,
       multiSelectedIds: [],
       selectionRangeIds: [],
     }));
+  },
+  activateItem(pathId) {
+    const currentItem = get().tree.entityMap.get(pathId);
+    if (!currentItem) {
+      return;
+    }
+
+    // 같은 노드를 다시 눌러도 새 요청 객체를 만들어 지도 포커스를 다시 실행한다.
+    set({
+      selectedItemId: pathId,
+      mapFocusRequest: { pathId },
+      multiSelectedIds: [],
+      selectionRangeIds: [],
+    });
   },
   selectItem(pathId, extendSelection = false) {
     const state = get();
@@ -154,7 +170,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
     if (!extendSelection || !state.selectedItemId) {
       set({
         selectedItemId: pathId,
-        selectionRevision: state.selectionRevision + 1,
+        mapFocusRequest: null,
         multiSelectedIds: [],
         selectionRangeIds: [],
       });
@@ -165,7 +181,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
     if (!lastSelectedItem) {
       set({
         selectedItemId: pathId,
-        selectionRevision: state.selectionRevision + 1,
+        mapFocusRequest: null,
         multiSelectedIds: [],
         selectionRangeIds: [],
       });
@@ -188,12 +204,18 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
 
     // Shift 선택 중에도 최초 단일 선택은 anchor로 유지해 연속 범위 선택 기준으로 사용한다.
     set({
+      mapFocusRequest: null,
       multiSelectedIds: selectedItems.map((item) => item.pathId),
       selectionRangeIds: selectionRange.map((item) => item.pathId),
     });
   },
   clearSelection() {
-    set({ selectedItemId: null, multiSelectedIds: [], selectionRangeIds: [] });
+    set({
+      selectedItemId: null,
+      mapFocusRequest: null,
+      multiSelectedIds: [],
+      selectionRangeIds: [],
+    });
   },
   setActiveModule(activeModule) {
     // 탭을 직접 선택하면 접혀 있던 패널도 다시 표시하는 기존 UX를 유지한다.

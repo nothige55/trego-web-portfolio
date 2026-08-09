@@ -70,18 +70,23 @@ describe("usePlannerViewStore", () => {
     expect(usePlannerViewStore.getState().selectionRangeIds).toEqual([]);
   });
 
-  it("increments the selection revision for repeated single selection but not Shift selection", () => {
+  it("creates a new map focus request for repeated activation but not selection-only changes", () => {
     const store = usePlannerViewStore.getState();
     store.load(demoPlannerProject.nodes);
 
-    store.selectItem("day-one-airport");
-    expect(usePlannerViewStore.getState().selectionRevision).toBe(1);
+    store.activateItem("day-one-airport");
+    const firstRequest = usePlannerViewStore.getState().mapFocusRequest;
+    expect(firstRequest).toEqual({ pathId: "day-one-airport" });
+    expect(usePlannerViewStore.getState().selectedItemId).toBe("day-one-airport");
 
-    store.selectItem("day-one-airport");
-    expect(usePlannerViewStore.getState().selectionRevision).toBe(2);
+    store.activateItem("day-one-airport");
+    expect(usePlannerViewStore.getState().mapFocusRequest).toEqual({
+      pathId: "day-one-airport",
+    });
+    expect(usePlannerViewStore.getState().mapFocusRequest).not.toBe(firstRequest);
 
     store.selectItem("day-one-iho", true);
-    expect(usePlannerViewStore.getState().selectionRevision).toBe(2);
+    expect(usePlannerViewStore.getState().mapFocusRequest).toBeNull();
   });
 
   it("normalizes only the nodes visible between the shift-selection endpoints", () => {
