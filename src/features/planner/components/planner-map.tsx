@@ -253,7 +253,7 @@ function focusMap(map: MapboxMap, focus: PlannerMapFocus): void {
 export function PlannerMap({ accessToken }: { readonly accessToken?: string | null }) {
   const tree = usePlannerViewStore((state) => state.tree);
   const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
-  const selectionRevision = usePlannerViewStore((state) => state.selectionRevision);
+  const mapFocusRequest = usePlannerViewStore((state) => state.mapFocusRequest);
   const isModuleCollapsed = usePlannerViewStore((state) => state.isModuleCollapsed);
   const setModuleCollapsed = usePlannerViewStore((state) => state.setModuleCollapsed);
   const hiddenDayIds = usePlannerMapStore((state) => state.hiddenDayIds);
@@ -264,19 +264,19 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
   const [retryCount, setRetryCount] = useState(0);
   const isLoadedRef = useRef(false);
   const hasAppliedInitialCameraRef = useRef(false);
-  const lastFocusRevisionRef = useRef(-1);
+  const lastHandledFocusRequestRef = useRef(mapFocusRequest);
   const renderedMarkersRef = useRef(new Map<string, RenderedMarker>());
   const mapModel = useMemo(
     () => buildPlannerMapModel({ tree, hiddenDayIds, selectedItemId }),
     [hiddenDayIds, selectedItemId, tree],
   );
   const mapModelRef = useRef(mapModel);
-  const selectionRevisionRef = useRef(selectionRevision);
+  const mapFocusRequestRef = useRef(mapFocusRequest);
 
   useEffect(() => {
     mapModelRef.current = mapModel;
-    selectionRevisionRef.current = selectionRevision;
-  }, [mapModel, selectionRevision]);
+    mapFocusRequestRef.current = mapFocusRequest;
+  }, [mapFocusRequest, mapModel]);
 
   useEffect(() => {
     const container = mapContainerRef.current;
@@ -337,10 +337,12 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
         renderedMarkers,
       });
       hasAppliedInitialCameraRef.current = applyInitialCamera(map, mapModelRef.current);
-      if (mapModelRef.current.focus) {
-        focusMap(map, mapModelRef.current.focus);
+      const focusRequest = mapFocusRequestRef.current;
+      const focus = mapModelRef.current.focus;
+      if (focusRequest && focus?.pathId === focusRequest.pathId) {
+        focusMap(map, focus);
       }
-      lastFocusRevisionRef.current = selectionRevisionRef.current;
+      lastHandledFocusRequestRef.current = mapFocusRequestRef.current;
     };
 
     const handleError = () => {
@@ -376,7 +378,7 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
       mapRef.current = null;
       isLoadedRef.current = false;
       hasAppliedInitialCameraRef.current = false;
-      lastFocusRevisionRef.current = -1;
+      lastHandledFocusRequestRef.current = null;
     };
   }, [resolvedAccessToken, retryCount]);
 
@@ -393,16 +395,15 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
       hasAppliedInitialCameraRef.current = applyInitialCamera(map, mapModel);
     }
 
-    if (!mapModel.focus) {
-      lastFocusRevisionRef.current = selectionRevision;
+    if (!mapFocusRequest || lastHandledFocusRequestRef.current === mapFocusRequest) {
       return;
     }
 
-    if (lastFocusRevisionRef.current !== selectionRevision) {
+    if (mapModel.focus?.pathId === mapFocusRequest.pathId) {
       focusMap(map, mapModel.focus);
-      lastFocusRevisionRef.current = selectionRevision;
     }
-  }, [mapModel, selectionRevision]);
+    lastHandledFocusRequestRef.current = mapFocusRequest;
+  }, [mapFocusRequest, mapModel]);
 
   return (
     <section

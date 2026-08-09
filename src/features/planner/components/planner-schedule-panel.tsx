@@ -83,6 +83,7 @@ function PlannerTreeItem({
   const multiSelectedIds = usePlannerViewStore((state) => state.multiSelectedIds);
   const selectionRangeIds = usePlannerViewStore((state) => state.selectionRangeIds);
   const toggleExpanded = usePlannerViewStore((state) => state.toggleExpanded);
+  const activateItem = usePlannerViewStore((state) => state.activateItem);
   const selectItem = usePlannerViewStore((state) => state.selectItem);
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     id: node.pathId,
@@ -185,8 +186,13 @@ function PlannerTreeItem({
           parent={node.parentPathId ? entityMap.get(node.parentPathId) : undefined}
           className="flex-1 py-2.5 pr-2"
           onClick={(event) => {
-            // Shift 여부만 store에 전달하고 선택 범위 계산은 UI 밖에서 처리한다.
-            selectItem(node.pathId, event.shiftKey);
+            if (event.shiftKey) {
+              // 범위 선택은 선택 상태만 바꾸고 지도 카메라는 이동하지 않는다.
+              selectItem(node.pathId, true);
+              return;
+            }
+
+            activateItem(node.pathId);
           }}
           trailing={
             node.kind === "activity" && node.startTime ? (

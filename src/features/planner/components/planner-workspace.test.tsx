@@ -96,6 +96,26 @@ describe("PlannerWorkspace", () => {
     ).toBeInTheDocument();
   });
 
+  it("requests map focus for every plain row activation but not Shift selection", async () => {
+    const user = await renderPlanner();
+    const tree = screen.getByRole("tree", { name: "여행 일정" });
+    const wishRow = within(tree).getByRole("button", { name: "가보고 싶은 곳" });
+
+    await user.click(wishRow);
+    const firstRequest = usePlannerViewStore.getState().mapFocusRequest;
+    expect(firstRequest).toEqual({ pathId: "wish" });
+
+    await user.click(wishRow);
+    expect(usePlannerViewStore.getState().mapFocusRequest).toEqual({ pathId: "wish" });
+    expect(usePlannerViewStore.getState().mapFocusRequest).not.toBe(firstRequest);
+
+    await user.keyboard("{Shift>}");
+    await user.click(within(tree).getByRole("button", { name: "제주도" }));
+    await user.keyboard("{/Shift}");
+
+    expect(usePlannerViewStore.getState().mapFocusRequest).toBeNull();
+  });
+
   it("expands a branch, selects a range, and clears the selection from empty space", async () => {
     const user = await renderPlanner();
     const tree = screen.getByRole("tree", { name: "여행 일정" });

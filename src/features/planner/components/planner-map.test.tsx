@@ -198,7 +198,7 @@ describe("PlannerMap", () => {
 
   it("keeps Planner state while retrying a failed initial map load", async () => {
     const user = userEvent.setup();
-    usePlannerViewStore.getState().selectItem("day-one-airport");
+    usePlannerViewStore.getState().activateItem("day-one-airport");
     render(<PlannerMap accessToken="pk.test" />);
     const firstMap = mapboxMocks.mapInstances[0];
 
@@ -252,7 +252,7 @@ describe("PlannerMap", () => {
     map.fitBounds.mockClear();
 
     act(() => {
-      usePlannerViewStore.getState().selectItem("day-one-airport");
+      usePlannerViewStore.getState().activateItem("day-one-airport");
     });
     expect(map.easeTo).toHaveBeenCalledWith(
       expect.objectContaining({ center: [126.4914, 33.5104], zoom: 14, duration: 500 }),
@@ -267,7 +267,7 @@ describe("PlannerMap", () => {
 
     map.easeTo.mockClear();
     act(() => {
-      usePlannerViewStore.getState().selectItem("day-one-airport");
+      usePlannerViewStore.getState().activateItem("day-one-airport");
     });
     expect(map.easeTo).toHaveBeenCalledTimes(1);
     expect(mapboxMocks.mapConstructor).toHaveBeenCalledTimes(1);
@@ -281,7 +281,7 @@ describe("PlannerMap", () => {
 
     act(() => {
       usePlannerViewStore.getState().clearSelection();
-      usePlannerViewStore.getState().selectItem("day-one");
+      usePlannerViewStore.getState().activateItem("day-one");
     });
     expect(map.fitBounds).toHaveBeenCalledWith(
       expect.any(Array),
@@ -294,15 +294,45 @@ describe("PlannerMap", () => {
     map.fitBounds.mockClear();
     act(() => {
       usePlannerMapStore.getState().toggleDayVisibility("day-one");
-      usePlannerViewStore.getState().selectItem("day-one");
+      usePlannerViewStore.getState().activateItem("day-one");
     });
     expect(map.fitBounds).toHaveBeenCalledTimes(1);
 
     map.fitBounds.mockClear();
     act(() => {
       usePlannerViewStore.getState().clearSelection();
-      usePlannerViewStore.getState().selectItem("root");
+      usePlannerViewStore.getState().activateItem("root");
     });
+    expect(map.easeTo).not.toHaveBeenCalled();
+    expect(map.fitBounds).not.toHaveBeenCalled();
+  });
+
+  it("updates selection without moving the camera for selection-only and DnD changes", () => {
+    render(<PlannerMap accessToken="pk.test" />);
+    const map = mapboxMocks.mapInstances[0];
+
+    act(() => {
+      map.trigger("load");
+    });
+    map.easeTo.mockClear();
+    map.fitBounds.mockClear();
+
+    act(() => {
+      usePlannerViewStore.getState().selectItem("day-one-airport");
+    });
+    expect(usePlannerViewStore.getState().selectedItemId).toBe("day-one-airport");
+    expect(map.easeTo).not.toHaveBeenCalled();
+    expect(map.fitBounds).not.toHaveBeenCalled();
+
+    act(() => {
+      usePlannerViewStore.getState().moveNode("day-one-iho", {
+        parentPathId: "day-one",
+        siblingIndex: 0,
+        position: 0.05,
+      });
+    });
+    expect(usePlannerViewStore.getState().selectedItemId).toBe("day-one-iho");
+    expect(usePlannerViewStore.getState().mapFocusRequest).toBeNull();
     expect(map.easeTo).not.toHaveBeenCalled();
     expect(map.fitBounds).not.toHaveBeenCalled();
   });
@@ -314,7 +344,7 @@ describe("PlannerMap", () => {
 
     act(() => {
       map.trigger("load");
-      usePlannerViewStore.getState().selectItem("day-one-airport");
+      usePlannerViewStore.getState().activateItem("day-one-airport");
     });
     map.fitBounds.mockClear();
 
