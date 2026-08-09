@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import { applyPlannerDrop } from "@/features/planner/dnd/apply-planner-drop";
+import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import type {
   PlannerNode,
   PlannerNodePathId,
@@ -30,7 +32,9 @@ type PlannerViewActions = {
   load: (nodes: readonly PlannerNode[]) => void;
   reset: () => void;
   toggleExpanded: (pathId: PlannerNodePathId) => void;
+  expandNode: (pathId: PlannerNodePathId) => void;
   collapseAll: () => void;
+  moveNode: (pathId: PlannerNodePathId, destination: Readonly<PlannerDropDestination>) => void;
   selectItem: (pathId: PlannerNodePathId, extendSelection?: boolean) => void;
   clearSelection: () => void;
   setActiveModule: (module: PlannerModule) => void;
@@ -105,9 +109,39 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
       return { expandedIds };
     });
   },
+  expandNode(pathId) {
+    set((state) => {
+      if (
+        state.expandedIds.has(pathId) ||
+        (state.tree.childrenMap.get(pathId) ?? []).length === 0
+      ) {
+        return state;
+      }
+
+      const expandedIds = new Set(state.expandedIds);
+      let currentNode = state.tree.entityMap.get(pathId);
+
+      while (currentNode) {
+        expandedIds.add(currentNode.pathId);
+        currentNode = currentNode.parentPathId
+          ? state.tree.entityMap.get(currentNode.parentPathId)
+          : undefined;
+      }
+
+      return { expandedIds };
+    });
+  },
   collapseAll() {
     const { rootPathId } = get();
     set({ expandedIds: new Set(rootPathId ? [rootPathId] : []) });
+  },
+  moveNode(pathId, destination) {
+    set((state) => ({
+      tree: applyPlannerDrop(state.tree, pathId, destination),
+      selectedItemId: pathId,
+      multiSelectedIds: [],
+      selectionRangeIds: [],
+    }));
   },
   selectItem(pathId, extendSelection = false) {
     const state = get();

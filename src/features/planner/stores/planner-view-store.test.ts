@@ -41,6 +41,19 @@ describe("usePlannerViewStore", () => {
     expect([...usePlannerViewStore.getState().expandedIds]).toEqual(["root"]);
   });
 
+  it("expands a node and its ancestors without toggling an already expanded node", () => {
+    const store = usePlannerViewStore.getState();
+    store.load(demoPlannerProject.nodes);
+    store.expandNode("day-one");
+    store.expandNode("day-one");
+
+    expect([...usePlannerViewStore.getState().expandedIds]).toEqual([
+      "root",
+      "day-one",
+      "region-jeju",
+    ]);
+  });
+
   it("supports single and shift selection and clears both selections", () => {
     const store = usePlannerViewStore.getState();
     store.load(demoPlannerProject.nodes);
@@ -85,6 +98,28 @@ describe("usePlannerViewStore", () => {
     expect(state.multiSelectedIds).toEqual(["region-jeju"]);
     expect(state.selectionRangeIds).toContain("day-two-bijarim");
     expect(state.selectionRangeIds).not.toContain("region-jeju");
+  });
+
+  it("moves one node locally and rebuilds the planner tree", () => {
+    const store = usePlannerViewStore.getState();
+    store.load(demoPlannerProject.nodes);
+    store.selectItem("wish");
+    store.selectItem("region-jeju", true);
+    store.moveNode("wish-udo", {
+      parentPathId: "day-one",
+      siblingIndex: 1,
+      position: 0.15,
+    });
+
+    const state = usePlannerViewStore.getState();
+    expect(state.tree.entityMap.get("wish-udo")).toMatchObject({
+      parentPathId: "day-one",
+      position: 0.15,
+    });
+    expect(state.tree.childrenMap.get("day-one")?.map((node) => node.pathId)).toContain("wish-udo");
+    expect(state.selectedItemId).toBe("wish-udo");
+    expect(state.multiSelectedIds).toEqual([]);
+    expect(state.selectionRangeIds).toEqual([]);
   });
 
   it("switches modules and controls the module panel", () => {

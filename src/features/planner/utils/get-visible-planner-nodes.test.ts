@@ -20,6 +20,8 @@ describe("getVisiblePlannerNodes", () => {
       "wish",
       "region-jeju",
       "region-seogwipo",
+      "empty-wish",
+      "dnd-test-day",
     ]);
   });
 
@@ -45,6 +47,8 @@ describe("getVisiblePlannerNodes", () => {
       "day-two",
       "day-three",
       "region-seogwipo",
+      "empty-wish",
+      "dnd-test-day",
     ]);
   });
 
