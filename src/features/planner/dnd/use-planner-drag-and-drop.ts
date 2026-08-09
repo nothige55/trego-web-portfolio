@@ -38,7 +38,6 @@ interface UsePlannerDragAndDropParams {
       readonly position: number;
     },
   ) => void;
-  readonly selectItem: (pathId: PlannerNodePathId) => void;
 }
 
 export function usePlannerDragAndDrop({
@@ -48,7 +47,6 @@ export function usePlannerDragAndDrop({
   expandedIds,
   expandNode,
   moveNode,
-  selectItem,
 }: UsePlannerDragAndDropParams) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -103,7 +101,6 @@ export function usePlannerDragAndDrop({
     const pathId = String(event.active.id);
     expandedTargetActiveTopRef.current = null;
     setActivePathId(pathId);
-    selectItem(pathId);
   }
 
   function shouldStabilizeExpandedTarget(activeTop: number | undefined): boolean {

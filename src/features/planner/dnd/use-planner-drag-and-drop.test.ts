@@ -108,12 +108,11 @@ afterEach(() => {
 });
 
 describe("usePlannerDragAndDrop", () => {
-  it("arms an empty child target after 800ms and applies the calculated destination", () => {
+  it("cancels a pending child drop without invoking the selection-affecting move", () => {
     vi.useFakeTimers();
     const { tree, visibleItems } = createFixture();
     const expandNode = vi.fn();
     const moveNode = vi.fn();
-    const selectItem = vi.fn();
     const { result } = renderHook(() =>
       usePlannerDragAndDrop({
         tree,
@@ -122,7 +121,41 @@ describe("usePlannerDragAndDrop", () => {
         expandedIds: new Set(["root", "region", "source"]),
         expandNode,
         moveNode,
-        selectItem,
+      }),
+    );
+
+    act(() => {
+      result.current.handleDragStart({ active: { id: "active" } } as never);
+    });
+    act(() => {
+      result.current.handleDragMove(dragEvent("wish"));
+    });
+    expect(result.current.childTargetPathId).toBe("wish");
+
+    act(() => {
+      result.current.handleDragCancel();
+      vi.advanceTimersByTime(800);
+    });
+
+    expect(result.current.activePathId).toBeNull();
+    expect(result.current.childTargetPathId).toBeNull();
+    expect(moveNode).not.toHaveBeenCalled();
+    expect(expandNode).not.toHaveBeenCalled();
+  });
+
+  it("arms an empty child target after 800ms and applies the calculated destination", () => {
+    vi.useFakeTimers();
+    const { tree, visibleItems } = createFixture();
+    const expandNode = vi.fn();
+    const moveNode = vi.fn();
+    const { result } = renderHook(() =>
+      usePlannerDragAndDrop({
+        tree,
+        rootPathId: "root",
+        visibleItems,
+        expandedIds: new Set(["root", "region", "source"]),
+        expandNode,
+        moveNode,
       }),
     );
 
@@ -143,7 +176,6 @@ describe("usePlannerDragAndDrop", () => {
       result.current.handleDragEnd(dragEvent("wish"));
     });
 
-    expect(selectItem).toHaveBeenCalledWith("active");
     expect(moveNode).toHaveBeenCalledWith("active", {
       parentPathId: "wish",
       siblingIndex: 0,
@@ -167,7 +199,6 @@ describe("usePlannerDragAndDrop", () => {
         expandedIds: new Set(["root", "region", "source"]),
         expandNode,
         moveNode: vi.fn(),
-        selectItem: vi.fn(),
       }),
     );
 
@@ -202,7 +233,6 @@ describe("usePlannerDragAndDrop", () => {
           expandedIds,
           expandNode,
           moveNode,
-          selectItem: vi.fn(),
         }),
       { initialProps: { expandedIds: new Set(["root", "region", "source"]) } },
     );
@@ -239,7 +269,6 @@ describe("usePlannerDragAndDrop", () => {
           expandedIds,
           expandNode: vi.fn(),
           moveNode: vi.fn(),
-          selectItem: vi.fn(),
         }),
       { initialProps: { expandedIds: new Set(["root", "region", "source"]) } },
     );
@@ -271,7 +300,6 @@ describe("usePlannerDragAndDrop", () => {
         expandedIds: new Set(["root", "region", "source"]),
         expandNode: vi.fn(),
         moveNode,
-        selectItem: vi.fn(),
       }),
     );
 

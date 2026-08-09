@@ -64,6 +64,7 @@ function PlannerTreeItem({
   isChildTarget,
   isExpandingTarget,
   isSiblingDropActive,
+  suppressSelectionHighlight,
 }: {
   readonly node: FlattenedPlannerNode;
   readonly dayNumber?: number;
@@ -72,6 +73,7 @@ function PlannerTreeItem({
   readonly isChildTarget: boolean;
   readonly isExpandingTarget: boolean;
   readonly isSiblingDropActive: boolean;
+  readonly suppressSelectionHighlight: boolean;
 }) {
   const entityMap = usePlannerViewStore((state) => state.tree.entityMap);
   const childrenMap = usePlannerViewStore((state) => state.tree.childrenMap);
@@ -96,6 +98,9 @@ function PlannerTreeItem({
     !isSelected &&
     (selectionRangeIds.includes(node.pathId) ||
       hasSelectedAncestor(node, multiSelectedIds, entityMap));
+  // 선택 상태는 유지하되 drag overlay와 중복 강조되지 않도록 목록 배경만 숨긴다.
+  const isSelectedHighlightVisible = isSelected && !suppressSelectionHighlight;
+  const isSelectionContextHighlightVisible = isSelectionContext && !suppressSelectionHighlight;
   // 기존 Planner와 같이 root 다음 계층부터 30px 단위로 들여쓴다.
   // 별도의 20px 토글 칸을 항상 유지해 자식 유무와 관계없이 라벨 시작점을 맞춘다.
   const indentation = Math.max(0, node.depth - 1) * 30;
@@ -143,9 +148,9 @@ function PlannerTreeItem({
             ? "planner-child-drop-fill border-brand text-foreground"
             : isExpandingTarget
               ? "border-brand/60 bg-brand/5 text-foreground"
-              : isSelected
+              : isSelectedHighlightVisible
                 ? "border-brand bg-brand/10 text-foreground"
-                : isSelectionContext
+                : isSelectionContextHighlightVisible
                   ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
                   : "border-transparent text-foreground hover:bg-muted/70"
         }`}
@@ -203,7 +208,6 @@ export function PlannerSchedulePanel() {
   const clearSelection = usePlannerViewStore((state) => state.clearSelection);
   const expandNode = usePlannerViewStore((state) => state.expandNode);
   const moveNode = usePlannerViewStore((state) => state.moveNode);
-  const selectItem = usePlannerViewStore((state) => state.selectItem);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<PlannerNodePathId, HTMLLIElement>());
   const [topItemId, setTopItemId] = useState<PlannerNodePathId | null>(null);
@@ -253,7 +257,6 @@ export function PlannerSchedulePanel() {
     expandedIds,
     expandNode,
     moveNode,
-    selectItem,
   });
   const handlePanelDragStart = (event: DragStartEvent): void => {
     const pathId = String(event.active.id);
@@ -425,6 +428,7 @@ export function PlannerSchedulePanel() {
                       isChildTarget={childTargetPathId === node.pathId}
                       isExpandingTarget={expandingTargetPathId === node.pathId}
                       isSiblingDropActive={isSiblingDropActive}
+                      suppressSelectionHighlight={activePathId !== null}
                       itemRef={(element) => {
                         if (element) {
                           itemRefs.current.set(node.pathId, element);
