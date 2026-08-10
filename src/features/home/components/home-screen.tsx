@@ -8,14 +8,20 @@ import { ManualTripDialog } from "./manual-trip-dialog";
 import { RecentTrips } from "./recent-trips";
 
 type HomeScreenProps = {
+  currentUserName?: string;
   recentTrips: readonly HomeTripSummary[];
+  onLogin?: () => void;
+  onLogout?: () => void;
   onPromptSubmit: (prompt: string) => void;
   onCreateTrip: (trip: CreateTripInput) => void;
   onTripSelect?: (trip: HomeTripSummary) => void;
 };
 
 export function HomeScreen({
+  currentUserName,
   recentTrips,
+  onLogin,
+  onLogout,
   onPromptSubmit,
   onCreateTrip,
   onTripSelect,
@@ -35,14 +41,30 @@ export function HomeScreen({
   };
 
   return (
-    <main className="relative min-h-svh overflow-hidden bg-background px-4 py-10 sm:px-8 sm:py-14 lg:py-18">
+    <main className="relative min-h-svh overflow-hidden bg-background px-4 py-4 sm:px-8 sm:py-5">
       <div
         aria-hidden="true"
         className="absolute top-0 left-1/2 z-0 h-80 w-[42rem] max-w-[120vw] -translate-x-1/2 rounded-full bg-brand/10 blur-3xl"
       />
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center">
-        <section className="flex w-full max-w-3xl flex-col items-center pt-[8svh] text-center sm:pt-[10svh]">
+        <header className="absolute top-0 right-0 flex min-h-9 items-center justify-end gap-3 text-sm">
+          {currentUserName ? (
+            <>
+              <span className="text-muted-foreground">{currentUserName}님</span>
+              {onLogout ? (
+                <Button type="button" variant="outline" size="sm" onClick={onLogout}>
+                  로그아웃
+                </Button>
+              ) : null}
+            </>
+          ) : onLogin ? (
+            <Button type="button" variant="outline" size="sm" onClick={onLogin}>
+              로그인
+            </Button>
+          ) : null}
+        </header>
+        <section className="flex w-full max-w-3xl flex-col items-center pt-16 text-center sm:pt-10 lg:pt-12">
           <h1 className="max-w-2xl text-3xl font-bold tracking-[-0.035em] text-balance sm:text-5xl">
             어떤 여행을 계획하고 있나요?
           </h1>
@@ -82,7 +104,7 @@ export function HomeScreen({
           </form>
         </section>
 
-        <div className="mt-14 w-full sm:mt-18">
+        <div className="mt-12 w-full sm:mt-16">
           <RecentTrips
             trips={recentTrips}
             headerAction={<ManualTripDialog onCreateTrip={onCreateTrip} />}

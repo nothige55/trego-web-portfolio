@@ -16,6 +16,21 @@ describe("usePlannerViewStore", () => {
     expect(state.rootPathId).toBe("root");
     expect([...state.expandedIds]).toEqual(["root"]);
     expect(state.tree.flattenedItems).toHaveLength(demoPlannerProject.nodes.length);
+    expect(state.nodes).toHaveLength(demoPlannerProject.nodes.length);
+  });
+
+  it("replaces realtime nodes while preserving valid expanded and selected state", () => {
+    const store = usePlannerViewStore.getState();
+    store.load(demoPlannerProject.nodes);
+    store.toggleExpanded("wish");
+    store.selectItem("wish");
+
+    store.replaceNodes(demoPlannerProject.nodes.filter((node) => node.pathId !== "wish-udo"));
+
+    const state = usePlannerViewStore.getState();
+    expect(state.expandedIds).toContain("wish");
+    expect(state.selectedItemId).toBe("wish");
+    expect(state.tree.entityMap.has("wish-udo")).toBe(false);
   });
 
   it("expands a branch and all of its ancestors", () => {

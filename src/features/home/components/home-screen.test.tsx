@@ -127,4 +127,12 @@ describe("HomeScreen", () => {
     await user.click(screen.getByRole("button", { name: "제주 늦여름 여행 여행 열기" }));
     expect(onTripSelect).toHaveBeenCalledWith(recentTrips[0]);
   });
+
+  it("stretches every recent trip card to its equal-width grid column", () => {
+    renderHome({ onTripSelect: vi.fn() });
+
+    screen.getAllByRole("button", { name: /여행 열기/ }).forEach((card) => {
+      expect(card).toHaveClass("sm:w-full");
+    });
+  });
 });

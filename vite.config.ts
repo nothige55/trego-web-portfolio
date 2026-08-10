@@ -21,6 +21,12 @@ export default defineConfig({
         secure: false,
         target: "http://localhost:3000",
       },
+      "/project": {
+        changeOrigin: true,
+        secure: false,
+        target: "http://localhost:3000",
+        ws: true,
+      },
     },
   },
   test: {

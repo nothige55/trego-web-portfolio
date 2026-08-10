@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
+import { demoPlannerProject } from "@/features/planner/data/demo-planner";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import { render, screen, userEvent, within } from "@/testing/test-utils";
 
@@ -29,6 +30,8 @@ describe("PlannerSchedulePanel", () => {
 
   it("keeps selection semantics but hides its row highlight while dragging", async () => {
     const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
     const { rerender } = render(<PlannerWorkspace projectId="demo" />);
     const tree = await screen.findByRole("tree", { name: "여행 일정" });
 

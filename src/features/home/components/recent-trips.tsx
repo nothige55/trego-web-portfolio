@@ -72,7 +72,7 @@ export function RecentTrips({ trips, headerAction, onTripSelect }: RecentTripsPr
         <ul className="-mx-4 flex snap-x [scrollbar-width:none] gap-4 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 lg:grid-cols-3 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
           {trips.map((trip, index) => {
             const cardClassName =
-              "block w-[78vw] max-w-72 shrink-0 snap-start overflow-hidden rounded-3xl border bg-card shadow-sm transition sm:w-auto sm:max-w-none hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+              "block w-[78vw] max-w-72 shrink-0 snap-start overflow-hidden rounded-3xl border bg-card shadow-sm transition sm:w-full sm:max-w-none hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
             const content = (
               <TripCardContent
                 trip={trip}
@@ -81,7 +81,7 @@ export function RecentTrips({ trips, headerAction, onTripSelect }: RecentTripsPr
             );
 
             return (
-              <li key={trip.id}>
+              <li key={trip.id} className="w-full">
                 {onTripSelect ? (
                   <button
                     type="button"

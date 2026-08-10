@@ -1,4 +1,5 @@
 import { ChevronLeft, Compass, MessageSquare } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,9 +16,12 @@ const modules: Array<{
   { value: "chat", label: "채팅", icon: MessageSquare },
 ];
 
-// 기존 Planner의 두 번째 패널 구조를 보존하는 임시 shell이다.
-// 실제 Explore와 Chat feature는 각 기능 이식 단계에서 app 조합을 통해 연결한다.
-export function PlannerModulePanel() {
+// app 계층에서 주입한 Chat UI와 아직 이식되지 않은 Explore placeholder를 전환한다.
+type PlannerModulePanelProps = {
+  readonly chatContent?: ReactNode;
+};
+
+export function PlannerModulePanel({ chatContent }: PlannerModulePanelProps) {
   const activeModule = usePlannerViewStore((state) => state.activeModule);
   const setActiveModule = usePlannerViewStore((state) => state.setActiveModule);
   const setModuleCollapsed = usePlannerViewStore((state) => state.setModuleCollapsed);
@@ -67,25 +71,29 @@ export function PlannerModulePanel() {
       </header>
 
       <div className="flex min-h-0 flex-1 p-4">
-        <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-8 text-center">
-          {activeModule === "explore" ? (
-            <>
-              <Compass aria-hidden="true" className="size-7 text-brand" />
-              <h2 className="mt-4 text-sm font-semibold">장소 탐색을 준비 중입니다</h2>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Google Places 검색은 지도 연동 단계에서 연결합니다.
-              </p>
-            </>
-          ) : (
-            <>
-              <MessageSquare aria-hidden="true" className="size-7 text-brand" />
-              <h2 className="mt-4 text-sm font-semibold">여행 채팅을 준비 중입니다</h2>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                실시간 메시지는 SignalR 연동 단계에서 연결합니다.
-              </p>
-            </>
-          )}
-        </div>
+        {activeModule === "chat" && chatContent ? (
+          chatContent
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-8 text-center">
+            {activeModule === "explore" ? (
+              <>
+                <Compass aria-hidden="true" className="size-7 text-brand" />
+                <h2 className="mt-4 text-sm font-semibold">장소 탐색을 준비 중입니다</h2>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Google Places 검색은 지도 연동 단계에서 연결합니다.
+                </p>
+              </>
+            ) : (
+              <>
+                <MessageSquare aria-hidden="true" className="size-7 text-brand" />
+                <h2 className="mt-4 text-sm font-semibold">여행 채팅을 준비 중입니다</h2>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  실시간 메시지는 SignalR 연동 단계에서 연결합니다.
+                </p>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   );
