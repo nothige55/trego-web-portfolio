@@ -17,7 +17,6 @@ import {
   PlannerBreadcrumb,
 } from "@/features/planner/components/planner-breadcrumb";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
-import { demoPlannerProject } from "@/features/planner/data/demo-planner";
 import { calculatePlannerDragFootprintHeight } from "@/features/planner/dnd/resolve-planner-drop";
 import { usePlannerDragAndDrop } from "@/features/planner/dnd/use-planner-drag-and-drop";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
@@ -211,7 +210,7 @@ function PlannerTreeItem({
 }
 
 export function PlannerSchedulePanel() {
-  const projectDetails = usePlannerViewStore((state) => state.projectDetails) ?? demoPlannerProject;
+  const projectDetails = usePlannerViewStore((state) => state.projectDetails);
   const tree = usePlannerViewStore((state) => state.tree);
   const rootPathId = usePlannerViewStore((state) => state.rootPathId);
   const expandedIds = usePlannerViewStore((state) => state.expandedIds);
@@ -228,7 +227,7 @@ export function PlannerSchedulePanel() {
     [expandedIds, tree.childrenMap, tree.flattenedItems],
   );
   const dayNumberByPathId = useMemo(() => {
-    const startDate = new Date(`${projectDetails.startDate}T00:00:00Z`);
+    const startDate = new Date(`${projectDetails?.startDate ?? "1970-01-01"}T00:00:00Z`);
     const dayNumbers = new Map<PlannerNodePathId, number>();
     let dayOffset = 0;
 
@@ -244,7 +243,7 @@ export function PlannerSchedulePanel() {
     });
 
     return dayNumbers;
-  }, [projectDetails.startDate, tree.flattenedItems]);
+  }, [projectDetails?.startDate, tree.flattenedItems]);
   // root는 프로젝트 컨테이너이므로 탐색 순서에는 사용하되 목록에서는 숨긴다.
   const renderedItems = useMemo(
     () => visibleItems.filter((item) => item.pathId !== rootPathId),
@@ -346,6 +345,19 @@ export function PlannerSchedulePanel() {
     return siblings.length === 1 && item.depth === 2;
   };
 
+  if (!projectDetails) {
+    return (
+      <aside
+        aria-label="일정 패널"
+        className="z-20 flex h-full w-80 shrink-0 items-center justify-center border-r bg-card p-6 text-card-foreground"
+      >
+        <p role="status" className="text-sm text-muted-foreground">
+          여행 일정 정보를 불러오는 중입니다.
+        </p>
+      </aside>
+    );
+  }
+
   return (
     <aside
       aria-label="일정 패널"
@@ -419,6 +431,11 @@ export function PlannerSchedulePanel() {
                   }
                 }}
               >
+                {sortableItems.length === 0 ? (
+                  <li className="px-6 pt-12 text-sm text-muted-foreground">
+                    아직 등록된 일정이 없습니다.
+                  </li>
+                ) : null}
                 {sortableItems.map((node, index) => {
                   const nextItem = sortableItems[index + 1];
                   const boundaryAncestor =

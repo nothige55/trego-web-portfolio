@@ -1,10 +1,15 @@
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PlannerRealtimeDemo } from "@/app/realtime/planner-realtime-demo";
+import { ProjectPlannerPage } from "@/app/realtime/project-planner-page";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { ApiClient } from "@/lib/api-client";
 import type { SignalRClient, SignalRConnectionStatus } from "@/lib/signalr-client";
 import { fireEvent, render, screen, userEvent, waitFor } from "@/testing/test-utils";
+
+vi.mock("@/features/planner/components/planner-map", () => ({
+  PlannerMap: () => <section aria-label="지도 영역" />,
+}));
 
 function createFakeSignalRClient() {
   const statusListeners = new Set<(status: SignalRConnectionStatus) => void>();
@@ -86,7 +91,7 @@ function createRestClient() {
   return { client: { get } as unknown as ApiClient, get };
 }
 
-describe("PlannerRealtimeDemo", () => {
+describe("ProjectPlannerPage", () => {
   afterEach(() => {
     usePlannerViewStore.getState().reset();
   });
@@ -96,7 +101,7 @@ describe("PlannerRealtimeDemo", () => {
     const rest = createRestClient();
     const user = userEvent.setup();
     render(
-      <PlannerRealtimeDemo
+      <ProjectPlannerPage
         clientFactory={() => signalR.client}
         identity={{
           accessToken: "token",
@@ -109,6 +114,8 @@ describe("PlannerRealtimeDemo", () => {
       />,
     );
 
+    expect(screen.getByRole("status")).toHaveTextContent("여행 일정 데이터를 불러오는 중입니다.");
+    expect(screen.queryByRole("heading", { name: "제주도 7일 여행" })).not.toBeInTheDocument();
     await screen.findByRole("heading", { name: "Live project" });
     expect(signalR.invoke).toHaveBeenCalledWith(
       "JoinProject",
@@ -117,6 +124,11 @@ describe("PlannerRealtimeDemo", () => {
     expect(rest.get).toHaveBeenCalledWith(
       "/api/projects/33333333-3333-3333-3333-333333333333/messages",
     );
+    expect(rest.get).toHaveBeenCalledWith("/api/projects/33333333-3333-3333-3333-333333333333");
+    expect(rest.get).toHaveBeenCalledWith(
+      "/api/v2/projects/33333333-3333-3333-3333-333333333333/nodes",
+    );
+    expect(screen.getByText("아직 등록된 일정이 없습니다.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "채팅" }));
     expect(await screen.findByText("REST history")).toBeInTheDocument();
@@ -166,7 +178,7 @@ describe("PlannerRealtimeDemo", () => {
     const rest = createRestClient();
 
     render(
-      <PlannerRealtimeDemo
+      <ProjectPlannerPage
         clientFactory={() => signalR.client}
         identity={{
           accessToken: "token",
@@ -179,11 +191,67 @@ describe("PlannerRealtimeDemo", () => {
       />,
     );
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "채팅" }));
+    await userEvent.setup().click(await screen.findByRole("button", { name: "채팅" }));
 
     expect(await screen.findByText("REST history")).toBeInTheDocument();
     expect(rest.get).toHaveBeenCalledWith(
       "/api/projects/33333333-3333-3333-3333-333333333333/messages",
     );
+  });
+
+  it("finishes the real project load under React StrictMode", async () => {
+    const signalR = createFakeSignalRClient();
+    const rest = createRestClient();
+
+    render(
+      <StrictMode>
+        <ProjectPlannerPage
+          clientFactory={() => signalR.client}
+          identity={{
+            accessToken: "token",
+            email: "one@example.com",
+            id: "11111111-1111-1111-1111-111111111111",
+            name: "One",
+          }}
+          projectId="33333333-3333-3333-3333-333333333333"
+          restClient={rest.client}
+        />
+      </StrictMode>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Live project" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "제주도 7일 여행" })).not.toBeInTheDocument();
+  });
+
+  it("shows the project REST error without falling back to fixture data", async () => {
+    const signalR = createFakeSignalRClient();
+    const get = vi.fn(async (url: string) => {
+      if (url.endsWith("/messages")) {
+        return [];
+      }
+
+      throw new Error("project REST failed");
+    });
+
+    render(
+      <ProjectPlannerPage
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "11111111-1111-1111-1111-111111111111",
+          name: "One",
+        }}
+        projectId="33333333-3333-3333-3333-333333333333"
+        restClient={{ get } as unknown as ApiClient}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "여행 일정을 불러오지 못했습니다." }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("project REST failed")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "제주도 7일 여행" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "다시 연결" })).toBeInTheDocument();
   });
 });

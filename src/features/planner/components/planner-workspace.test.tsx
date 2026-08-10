@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
+import { demoPlannerProject } from "@/features/planner/data/demo-planner";
 import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import { fireEvent, render, screen, userEvent, within } from "@/testing/test-utils";
@@ -36,6 +37,8 @@ describe("PlannerWorkspace", () => {
 
   async function renderPlanner() {
     const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
     render(<PlannerWorkspace projectId="demo" />);
     await screen.findByRole("main", { name: "여행 일정 플래너" });
     await screen.findByTestId("planner-map-mock");

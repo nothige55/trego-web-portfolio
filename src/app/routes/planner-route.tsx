@@ -1,7 +1,7 @@
 import { useParams } from "react-router";
 
 import { useAuth } from "@/app/auth/auth-context";
-import { PlannerRealtimeDemo } from "@/app/realtime/planner-realtime-demo";
+import { ProjectPlannerPage } from "@/app/realtime/project-planner-page";
 import { AuthScreen } from "@/features/auth/components/auth-screen";
 
 // app route는 URL 해석과 feature 조합만 담당한다.
@@ -22,5 +22,5 @@ export function PlannerRoute() {
     return <AuthScreen isSubmitting={isSubmitting} onLogin={login} onRegister={register} />;
   }
 
-  return <PlannerRealtimeDemo identity={session} projectId={projectId} restClient={client} />;
+  return <ProjectPlannerPage identity={session} projectId={projectId} restClient={client} />;
 }
