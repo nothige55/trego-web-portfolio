@@ -33,7 +33,6 @@ import type { SignalRClient, SignalRClientOptions } from "@/lib/signalr-client";
 type PlannerRealtimeDemoProps = {
   readonly clientFactory?: (options: SignalRClientOptions) => SignalRClient;
   readonly identity: AuthSession;
-  readonly onLogout: () => void;
   readonly projectId: string;
   readonly restClient?: ApiClient;
 };
@@ -41,7 +40,6 @@ type PlannerRealtimeDemoProps = {
 export function PlannerRealtimeDemo({
   clientFactory,
   identity,
-  onLogout,
   projectId,
   restClient: injectedRestClient,
 }: PlannerRealtimeDemoProps) {
@@ -186,7 +184,6 @@ export function PlannerRealtimeDemo({
         identity={identity}
         loadChatHistory={loadChatHistory}
         messages={messages}
-        onLogout={onLogout}
         presenceController={presenceController}
         projectId={projectId}
         restClient={authorizedRestClient}
@@ -201,7 +198,6 @@ type PlannerRealtimeDemoContentProps = {
   readonly identity: AuthSession;
   readonly loadChatHistory: () => Promise<void>;
   readonly messages: readonly ChatMessage[];
-  readonly onLogout: () => void;
   readonly presenceController: CursorPresenceController | null;
   readonly projectId: string;
   readonly restClient: ApiClient;
@@ -213,7 +209,6 @@ function PlannerRealtimeDemoContent({
   identity,
   loadChatHistory,
   messages,
-  onLogout,
   presenceController,
   projectId,
   restClient,
@@ -250,7 +245,6 @@ function PlannerRealtimeDemoContent({
               <ProjectMemberInviteForm client={restClient} projectId={projectId} />
             }
             messages={messages}
-            onLogout={onLogout}
             onRetryHistory={() => void loadChatHistory().catch(() => undefined)}
             onSend={handleSend}
           />

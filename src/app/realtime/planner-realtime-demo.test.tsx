@@ -104,7 +104,6 @@ describe("PlannerRealtimeDemo", () => {
           id: "11111111-1111-1111-1111-111111111111",
           name: "One",
         }}
-        onLogout={vi.fn()}
         projectId="33333333-3333-3333-3333-333333333333"
         restClient={rest.client}
       />,
@@ -175,7 +174,6 @@ describe("PlannerRealtimeDemo", () => {
           id: "11111111-1111-1111-1111-111111111111",
           name: "One",
         }}
-        onLogout={vi.fn()}
         projectId="33333333-3333-3333-3333-333333333333"
         restClient={rest.client}
       />,

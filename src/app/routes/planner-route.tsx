@@ -8,7 +8,7 @@ import { AuthScreen } from "@/features/auth/components/auth-screen";
 // projectTitle은 기존 URL 호환용이며, fixture 단계의 화면 데이터로 사용하지 않는다.
 export function PlannerRoute() {
   const { projectId = "demo" } = useParams();
-  const { client, isSubmitting, login, logout, register, session, status } = useAuth();
+  const { client, isSubmitting, login, register, session, status } = useAuth();
 
   if (status === "loading") {
     return (
@@ -22,12 +22,5 @@ export function PlannerRoute() {
     return <AuthScreen isSubmitting={isSubmitting} onLogin={login} onRegister={register} />;
   }
 
-  return (
-    <PlannerRealtimeDemo
-      identity={session}
-      onLogout={logout}
-      projectId={projectId}
-      restClient={client}
-    />
-  );
+  return <PlannerRealtimeDemo identity={session} projectId={projectId} restClient={client} />;
 }

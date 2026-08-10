@@ -1,5 +1,13 @@
 import { LoaderCircle, Send, UserPlus, UserRound } from "lucide-react";
-import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { Button } from "@/components/ui/button";
 import type { ChatMessage, SendChatMessageResult } from "@/features/chat";
@@ -11,7 +19,6 @@ type RealtimeChatPanelProps = {
   readonly isReady: boolean;
   readonly memberInviteContent?: ReactNode;
   readonly messages: readonly ChatMessage[];
-  readonly onLogout: () => void;
   readonly onRetryHistory?: () => void;
   readonly onSend: (content: string) => Promise<SendChatMessageResult>;
 };
@@ -27,6 +34,12 @@ function formatMessageTime(value: string): string {
       }).format(date);
 }
 
+const CHAT_BOTTOM_THRESHOLD = 24;
+
+function isNearChatBottom(element: HTMLDivElement): boolean {
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= CHAT_BOTTOM_THRESHOLD;
+}
+
 export function RealtimeChatPanel({
   currentUserId,
   currentUserName,
@@ -34,7 +47,6 @@ export function RealtimeChatPanel({
   isReady,
   memberInviteContent,
   messages,
-  onLogout,
   onRetryHistory,
   onSend,
 }: RealtimeChatPanelProps) {
@@ -42,11 +54,38 @@ export function RealtimeChatPanel({
   const [isMemberInviteOpen, setIsMemberInviteOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const latestMessageRef = useRef<HTMLDivElement>(null);
+  const hasPositionedInitiallyRef = useRef(false);
+  const shouldFollowLatestRef = useRef(true);
   const sortedMessages = useMemo(
     () => [...messages].sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
     [messages],
   );
   const trimmedDraft = draft.trim();
+  const latestMessageId = sortedMessages.at(-1)?.messageId ?? null;
+  const scrollToLatest = useCallback((behavior: ScrollBehavior) => {
+    const latestMessage = latestMessageRef.current;
+    if (typeof latestMessage?.scrollIntoView === "function") {
+      latestMessage.scrollIntoView({ behavior, block: "end" });
+    }
+    shouldFollowLatestRef.current = true;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (historyStatus === "loading") {
+      return;
+    }
+
+    if (!hasPositionedInitiallyRef.current) {
+      hasPositionedInitiallyRef.current = true;
+      scrollToLatest("auto");
+      return;
+    }
+
+    if (shouldFollowLatestRef.current) {
+      scrollToLatest("smooth");
+    }
+  }, [historyStatus, latestMessageId, scrollToLatest]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,6 +94,7 @@ export function RealtimeChatPanel({
       return;
     }
 
+    scrollToLatest("smooth");
     setIsSending(true);
     setSendError(null);
     const result = await onSend(trimmedDraft);
@@ -85,14 +125,19 @@ export function RealtimeChatPanel({
               멤버 추가
             </Button>
           ) : null}
-          <Button type="button" variant="ghost" size="sm" onClick={onLogout}>
-            로그아웃
-          </Button>
         </div>
       </div>
       {isMemberInviteOpen ? memberInviteContent : null}
 
-      <div aria-live="polite" className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4">
+      <div
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions"
+        className="scrollbar-hide min-h-0 flex-1 space-y-3 overflow-y-auto py-4"
+        onScroll={(event) => {
+          shouldFollowLatestRef.current = isNearChatBottom(event.currentTarget);
+        }}
+      >
         {historyStatus === "loading" && sortedMessages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
             <LoaderCircle aria-hidden="true" className="size-7 animate-spin text-brand" />
@@ -153,6 +198,7 @@ export function RealtimeChatPanel({
             );
           })
         )}
+        <div ref={latestMessageRef} aria-hidden="true" />
       </div>
 
       <form className="border-t pt-3" onSubmit={handleSubmit}>
