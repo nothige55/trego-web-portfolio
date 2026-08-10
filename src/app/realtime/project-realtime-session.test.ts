@@ -109,6 +109,24 @@ describe("createProjectRealtimeSession", () => {
     expect(resync).toHaveBeenCalledTimes(2);
   });
 
+  it("rejects manual retry while automatic reconnect is in progress", async () => {
+    const { client, emit } = createFakeClient();
+    const session = createProjectRealtimeSession({
+      client,
+      projectId: "project-id",
+      registerSubscriptions: vi.fn(),
+      resync: vi.fn(),
+    });
+    await session.start();
+    emit("reconnecting");
+
+    await expect(session.retry()).rejects.toThrow(
+      "Cannot retry realtime session while status is 'reconnecting'",
+    );
+
+    expect(client.start).toHaveBeenCalledTimes(1);
+  });
+
   it("surfaces join failures without marking writes as ready", async () => {
     const { client, invokeMock } = createFakeClient();
     const joinError = new Error("join failed");
@@ -144,5 +162,56 @@ describe("createProjectRealtimeSession", () => {
 
     expect(unregister).toHaveBeenCalledTimes(1);
     expect(client.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not surface an intentional cleanup cancellation as a connection error", async () => {
+    const { client } = createFakeClient();
+    let rejectStart: ((error: Error) => void) | undefined;
+    client.start = vi.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectStart = reject;
+        }),
+    );
+    const onError = vi.fn();
+    const session = createProjectRealtimeSession({
+      client,
+      onError,
+      projectId: "project-id",
+      registerSubscriptions: vi.fn(),
+      resync: vi.fn(),
+    });
+
+    const start = session.start();
+    const startExpectation = expect(start).rejects.toThrow("cancelled by cleanup");
+    await session.stop();
+    rejectStart?.(new Error("cancelled by cleanup"));
+
+    await startExpectation;
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("does not join after cleanup when a pending start resolves", async () => {
+    const { client, invokeMock } = createFakeClient();
+    let resolveStart: (() => void) | undefined;
+    client.start = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveStart = resolve;
+        }),
+    );
+    const session = createProjectRealtimeSession({
+      client,
+      projectId: "project-id",
+      registerSubscriptions: vi.fn(),
+      resync: vi.fn(),
+    });
+
+    const start = session.start();
+    resolveStart?.();
+    await session.stop();
+    await expect(start).rejects.toThrow("Project realtime session is stopped");
+
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 });

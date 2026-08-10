@@ -1,4 +1,4 @@
-import { type HubConnection, HubConnectionBuilder } from "@microsoft/signalr";
+import { type HubConnection, HubConnectionBuilder, HubConnectionState } from "@microsoft/signalr";
 
 import { env } from "@/config/env";
 
@@ -57,21 +57,25 @@ function toError(error: unknown): Error {
 }
 
 function wait(delay: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return Promise.reject(new SignalRStartCancelledError());
+  }
+
   if (delay === 0) {
-    return signal.aborted ? Promise.reject(new SignalRStartCancelledError()) : Promise.resolve();
+    return Promise.resolve();
   }
 
   return new Promise((resolve, reject) => {
-    const timeoutId = window.setTimeout(resolve, delay);
+    const handleAbort = () => {
+      window.clearTimeout(timeoutId);
+      reject(new SignalRStartCancelledError());
+    };
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener("abort", handleAbort);
+      resolve();
+    }, delay);
 
-    signal.addEventListener(
-      "abort",
-      () => {
-        window.clearTimeout(timeoutId);
-        reject(new SignalRStartCancelledError());
-      },
-      { once: true },
-    );
+    signal.addEventListener("abort", handleAbort, { once: true });
   });
 }
 
@@ -106,6 +110,7 @@ export function createSignalRClient({
   let status: SignalRConnectionStatus = "idle";
   let startAbortController: AbortController | null = null;
   let startPromise: Promise<void> | null = null;
+  let restartPromise: Promise<void> | null = null;
   let stopPromise: Promise<void> | null = null;
   let isManualStop = false;
 
@@ -147,6 +152,15 @@ export function createSignalRClient({
     for (const retryDelay of initialRetryDelays) {
       await wait(retryDelay, signal);
 
+      if (connection.state === HubConnectionState.Connected) {
+        setStatus("connected");
+        return;
+      }
+
+      if (connection.state !== HubConnectionState.Disconnected) {
+        throw new Error(`Cannot start SignalR while HubConnection is '${connection.state}'.`);
+      }
+
       try {
         await connection.start();
 
@@ -161,7 +175,15 @@ export function createSignalRClient({
           throw error;
         }
 
+        if (signal.aborted) {
+          throw new SignalRStartCancelledError();
+        }
+
         lastError = toError(error);
+
+        if (connection.state !== HubConnectionState.Disconnected) {
+          throw lastError;
+        }
       }
     }
 
@@ -171,12 +193,95 @@ export function createSignalRClient({
     throw connectionError;
   }
 
+  function startClient(): Promise<void> {
+    if (restartPromise) {
+      return restartPromise;
+    }
+
+    if (stopPromise) {
+      restartPromise = stopPromise
+        .catch(() => undefined)
+        .then(() => {
+          restartPromise = null;
+          return startClient();
+        });
+      return restartPromise;
+    }
+
+    if (connection.state === HubConnectionState.Connected) {
+      setStatus("connected");
+      return Promise.resolve();
+    }
+
+    if (startPromise) {
+      return startPromise;
+    }
+
+    if (connection.state === HubConnectionState.Reconnecting) {
+      return Promise.reject(new Error("SignalR automatic reconnect is already in progress."));
+    }
+
+    if (connection.state === HubConnectionState.Disconnecting) {
+      const connectionStop = connection.stop();
+      const pendingStop = connectionStop.finally(() => {
+        setStatus("idle");
+        stopPromise = null;
+      });
+      stopPromise = pendingStop;
+      return startClient();
+    }
+
+    if (connection.state !== HubConnectionState.Disconnected) {
+      return Promise.reject(
+        new Error(`Cannot start SignalR while HubConnection is '${connection.state}'.`),
+      );
+    }
+
+    isManualStop = false;
+    startAbortController = new AbortController();
+    const pendingStart = startWithRetry(startAbortController.signal).finally(() => {
+      startAbortController = null;
+      startPromise = null;
+    });
+    startPromise = pendingStart;
+
+    return startPromise;
+  }
+
+  function stopClient(): Promise<void> {
+    if (stopPromise) {
+      return stopPromise;
+    }
+
+    isManualStop = true;
+    startAbortController?.abort();
+    const pendingStart = startPromise;
+    const connectionStop = connection.stop();
+    const pendingStop = Promise.allSettled(
+      pendingStart ? [connectionStop, pendingStart] : [connectionStop],
+    ).then((results) => {
+      const stopResult = results[0];
+
+      if (stopResult?.status === "rejected") {
+        throw stopResult.reason;
+      }
+    });
+
+    const finalStop = pendingStop.finally(() => {
+      setStatus("idle");
+      stopPromise = null;
+    });
+    stopPromise = finalStop;
+
+    return stopPromise;
+  }
+
   return {
     getStatus() {
       return status;
     },
     async invoke<TResult = void>(methodName: string, ...args: readonly unknown[]) {
-      if (status !== "connected") {
+      if (connection.state !== HubConnectionState.Connected) {
         throw new SignalRNotConnectedError();
       }
 
@@ -195,38 +300,8 @@ export function createSignalRClient({
         connection.off(eventName, handler);
       };
     },
-    start() {
-      if (status === "connected") {
-        return Promise.resolve();
-      }
-
-      if (startPromise) {
-        return startPromise;
-      }
-
-      isManualStop = false;
-      startAbortController = new AbortController();
-      startPromise = startWithRetry(startAbortController.signal).finally(() => {
-        startAbortController = null;
-        startPromise = null;
-      });
-
-      return startPromise;
-    },
-    stop() {
-      if (stopPromise) {
-        return stopPromise;
-      }
-
-      isManualStop = true;
-      startAbortController?.abort();
-      stopPromise = connection.stop().finally(() => {
-        setStatus("idle");
-        stopPromise = null;
-      });
-
-      return stopPromise;
-    },
+    start: startClient,
+    stop: stopClient,
     subscribeStatus(listener: (nextStatus: SignalRConnectionStatus) => void) {
       statusListeners.add(listener);
       listener(status);

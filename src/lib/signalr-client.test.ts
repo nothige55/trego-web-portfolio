@@ -7,13 +7,24 @@ import {
 } from "@/lib/signalr-client";
 
 const signalRMock = vi.hoisted(() => {
+  const states = {
+    Connected: "Connected",
+    Connecting: "Connecting",
+    Disconnected: "Disconnected",
+    Disconnecting: "Disconnecting",
+    Reconnecting: "Reconnecting",
+  } as const;
   const callbacks: {
     close?: (error?: Error) => void;
     reconnected?: (connectionId?: string) => void;
     reconnecting?: (error?: Error) => void;
   } = {};
+  let state: (typeof states)[keyof typeof states] = states.Disconnected;
 
   const connection = {
+    get state() {
+      return state;
+    },
     invoke: vi.fn(),
     off: vi.fn(),
     on: vi.fn(),
@@ -36,10 +47,31 @@ const signalRMock = vi.hoisted(() => {
     withUrl: vi.fn(),
   };
 
-  return { builder, callbacks, connection };
+  return {
+    builder,
+    callbacks,
+    connection,
+    emitClose(error?: Error) {
+      state = states.Disconnected;
+      callbacks.close?.(error);
+    },
+    emitReconnected() {
+      state = states.Connected;
+      callbacks.reconnected?.("connection-id");
+    },
+    emitReconnecting(error?: Error) {
+      state = states.Reconnecting;
+      callbacks.reconnecting?.(error);
+    },
+    setState(nextState: (typeof states)[keyof typeof states]) {
+      state = nextState;
+    },
+    states,
+  };
 });
 
 vi.mock("@microsoft/signalr", () => ({
+  HubConnectionState: signalRMock.states,
   HubConnectionBuilder: class HubConnectionBuilder {
     build() {
       return signalRMock.builder.build();
@@ -60,8 +92,23 @@ vi.mock("@microsoft/signalr", () => ({
 describe("createSignalRClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    signalRMock.connection.start.mockResolvedValue(undefined);
-    signalRMock.connection.stop.mockResolvedValue(undefined);
+    signalRMock.setState(signalRMock.states.Disconnected);
+    signalRMock.connection.start.mockImplementation(async () => {
+      if (signalRMock.connection.state !== signalRMock.states.Disconnected) {
+        throw new Error("Cannot start a HubConnection that is not in the 'Disconnected' state.");
+      }
+
+      signalRMock.setState(signalRMock.states.Connecting);
+      signalRMock.setState(signalRMock.states.Connected);
+    });
+    signalRMock.connection.stop.mockImplementation(async () => {
+      if (signalRMock.connection.state === signalRMock.states.Disconnected) {
+        return;
+      }
+
+      signalRMock.setState(signalRMock.states.Disconnecting);
+      signalRMock.emitClose();
+    });
   });
 
   it("configures the hub URL, access token, and reconnect delays", async () => {
@@ -87,11 +134,15 @@ describe("createSignalRClient", () => {
 
   it("shares one in-flight start and publishes status changes", async () => {
     let resolveStart: (() => void) | undefined;
-    signalRMock.connection.start.mockReturnValue(
-      new Promise<void>((resolve) => {
-        resolveStart = resolve;
-      }),
-    );
+    signalRMock.connection.start.mockImplementationOnce(() => {
+      signalRMock.setState(signalRMock.states.Connecting);
+      return new Promise<void>((resolve) => {
+        resolveStart = () => {
+          signalRMock.setState(signalRMock.states.Connected);
+          resolve();
+        };
+      });
+    });
     const client = createSignalRClient();
     const statuses: SignalRConnectionStatus[] = [];
     client.subscribeStatus((status) => statuses.push(status));
@@ -113,7 +164,11 @@ describe("createSignalRClient", () => {
     vi.useFakeTimers();
     const connectionError = new Error("offline");
     const onError = vi.fn();
-    signalRMock.connection.start.mockRejectedValue(connectionError);
+    signalRMock.connection.start.mockImplementation(async () => {
+      signalRMock.setState(signalRMock.states.Connecting);
+      signalRMock.setState(signalRMock.states.Disconnected);
+      throw connectionError;
+    });
     const client = createSignalRClient({
       initialRetryDelays: [0, 2_000, 5_000],
       onError,
@@ -136,9 +191,9 @@ describe("createSignalRClient", () => {
     client.subscribeStatus((status) => statuses.push(status));
     await client.start();
 
-    signalRMock.callbacks.reconnecting?.(new Error("lost"));
-    signalRMock.callbacks.reconnected?.("connection-id");
-    signalRMock.callbacks.close?.(new Error("closed"));
+    signalRMock.emitReconnecting(new Error("lost"));
+    signalRMock.emitReconnected();
+    signalRMock.emitClose(new Error("closed"));
 
     expect(statuses).toEqual([
       "idle",
@@ -170,13 +225,29 @@ describe("createSignalRClient", () => {
     expect(signalRMock.connection.off).toHaveBeenCalledWith("OnMessageReceived", handler);
   });
 
+  it("uses the actual HubConnection state before invoking", async () => {
+    const client = createSignalRClient();
+    await client.start();
+    signalRMock.setState(signalRMock.states.Reconnecting);
+
+    await expect(client.invoke("SendMessage", { content: "hello" })).rejects.toBeInstanceOf(
+      SignalRNotConnectedError,
+    );
+
+    expect(signalRMock.connection.invoke).not.toHaveBeenCalled();
+  });
+
   it("shares one stop call and returns to idle", async () => {
     let resolveStop: (() => void) | undefined;
-    signalRMock.connection.stop.mockReturnValue(
-      new Promise<void>((resolve) => {
-        resolveStop = resolve;
-      }),
-    );
+    signalRMock.connection.stop.mockImplementationOnce(() => {
+      signalRMock.setState(signalRMock.states.Disconnecting);
+      return new Promise<void>((resolve) => {
+        resolveStop = () => {
+          signalRMock.emitClose();
+          resolve();
+        };
+      });
+    });
     const client = createSignalRClient();
     await client.start();
 
@@ -189,5 +260,94 @@ describe("createSignalRClient", () => {
     resolveStop?.();
     await firstStop;
     expect(client.getStatus()).toBe("idle");
+  });
+
+  it("starts a fresh connection after a development cleanup cancels an in-flight start", async () => {
+    let rejectFirstStart: ((error: Error) => void) | undefined;
+    signalRMock.connection.start
+      .mockImplementationOnce(() => {
+        signalRMock.setState(signalRMock.states.Connecting);
+        return new Promise<void>((_resolve, reject) => {
+          rejectFirstStart = reject;
+        });
+      })
+      .mockImplementationOnce(async () => {
+        signalRMock.setState(signalRMock.states.Connecting);
+        signalRMock.setState(signalRMock.states.Connected);
+      });
+    signalRMock.connection.stop.mockImplementationOnce(async () => {
+      signalRMock.setState(signalRMock.states.Disconnecting);
+      signalRMock.setState(signalRMock.states.Disconnected);
+      rejectFirstStart?.(new Error("The connection was stopped before startup completed."));
+    });
+    const onError = vi.fn();
+    const client = createSignalRClient({ onError });
+
+    const cancelledStart = client.start();
+    const cancelledStartExpectation = expect(cancelledStart).rejects.toThrow(
+      "SignalR connection start was cancelled",
+    );
+    await vi.waitFor(() => expect(signalRMock.connection.start).toHaveBeenCalledTimes(1));
+    const stop = client.stop();
+    const restarted = client.start();
+    const duplicateRestart = client.start();
+
+    expect(restarted).toBe(duplicateRestart);
+
+    await cancelledStartExpectation;
+    await stop;
+    await restarted;
+
+    expect(signalRMock.connection.start).toHaveBeenCalledTimes(2);
+    expect(client.getStatus()).toBe("connected");
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("does not continue bounded retries after a delayed start is cancelled", async () => {
+    vi.useFakeTimers();
+    const connectionError = new Error("offline");
+    signalRMock.connection.start.mockImplementationOnce(async () => {
+      signalRMock.setState(signalRMock.states.Connecting);
+      signalRMock.setState(signalRMock.states.Disconnected);
+      throw connectionError;
+    });
+    const client = createSignalRClient();
+
+    const start = client.start();
+    const startExpectation = expect(start).rejects.toThrow(
+      "SignalR connection start was cancelled",
+    );
+    await vi.waitFor(() => expect(signalRMock.connection.start).toHaveBeenCalledTimes(1));
+
+    await client.stop();
+    await vi.runAllTimersAsync();
+    await startExpectation;
+
+    expect(signalRMock.connection.start).toHaveBeenCalledTimes(1);
+    expect(client.getStatus()).toBe("idle");
+    vi.useRealTimers();
+  });
+
+  it("does not manually start while automatic reconnect is in progress", async () => {
+    const client = createSignalRClient();
+    await client.start();
+    signalRMock.emitReconnecting(new Error("lost"));
+
+    await expect(client.start()).rejects.toThrow("automatic reconnect is already in progress");
+
+    expect(signalRMock.connection.start).toHaveBeenCalledTimes(1);
+    expect(client.getStatus()).toBe("reconnecting");
+  });
+
+  it("allows a fresh manual start after automatic reconnect is exhausted", async () => {
+    const client = createSignalRClient();
+    await client.start();
+    signalRMock.emitReconnecting(new Error("lost"));
+    signalRMock.emitClose();
+
+    await client.start();
+
+    expect(signalRMock.connection.start).toHaveBeenCalledTimes(2);
+    expect(client.getStatus()).toBe("connected");
   });
 });

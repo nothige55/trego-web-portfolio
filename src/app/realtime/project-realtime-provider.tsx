@@ -91,6 +91,10 @@ export function ProjectRealtimeStatusBanner() {
     return null;
   }
 
+  if (status === "reconnecting") {
+    return <div role="status">실시간 연결을 복구하고 있습니다.</div>;
+  }
+
   if (status === "disconnected" || error) {
     return (
       <div role="alert">
@@ -102,9 +106,5 @@ export function ProjectRealtimeStatusBanner() {
     );
   }
 
-  return (
-    <div role="status">
-      {status === "reconnecting" ? "실시간 연결을 복구하고 있습니다." : "실시간 연결 중입니다."}
-    </div>
-  );
+  return <div role="status">실시간 연결 중입니다.</div>;
 }

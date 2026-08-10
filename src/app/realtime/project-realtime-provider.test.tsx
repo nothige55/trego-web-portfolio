@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -44,6 +45,29 @@ function createFakeClient() {
 }
 
 describe("ProjectRealtimeProvider", () => {
+  it("survives the StrictMode setup-cleanup-setup lifecycle without a stale join", async () => {
+    const fake = createFakeClient();
+    const resync = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <StrictMode>
+        <ProjectRealtimeProvider
+          clientFactory={() => fake.client}
+          projectId="project-id"
+          registerSubscriptions={vi.fn()}
+          resync={resync}
+        >
+          <ProjectRealtimeStatusBanner />
+        </ProjectRealtimeProvider>
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(fake.invokeMock).toHaveBeenCalledWith("JoinProject", "project-id"));
+    expect(fake.invokeMock).toHaveBeenCalledTimes(1);
+    expect(fake.stopMock).toHaveBeenCalledTimes(1);
+    expect(resync).toHaveBeenCalledTimes(1);
+  });
+
   it("stops the old connection and creates a new session when the project changes", async () => {
     const first = createFakeClient();
     const second = createFakeClient();
@@ -107,5 +131,25 @@ describe("ProjectRealtimeProvider", () => {
     await waitFor(() => expect(fake.invokeMock).toHaveBeenCalledTimes(2));
     expect(fake.startMock).toHaveBeenCalledTimes(2);
     expect(resync).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not show manual retry while automatic reconnect is active", async () => {
+    const fake = createFakeClient();
+    render(
+      <ProjectRealtimeProvider
+        clientFactory={() => fake.client}
+        projectId="project-id"
+        registerSubscriptions={vi.fn()}
+        resync={vi.fn().mockResolvedValue(undefined)}
+      >
+        <ProjectRealtimeStatusBanner />
+      </ProjectRealtimeProvider>,
+    );
+    await waitFor(() => expect(fake.invokeMock).toHaveBeenCalledTimes(1));
+
+    fake.emit("reconnecting");
+
+    expect(await screen.findByRole("status")).toHaveTextContent("복구하고 있습니다");
+    expect(screen.queryByRole("button", { name: "다시 연결" })).not.toBeInTheDocument();
   });
 });

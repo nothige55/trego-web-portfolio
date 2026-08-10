@@ -50,10 +50,14 @@ export function createProjectRealtimeSession({
     listeners.forEach((listener) => listener(snapshot));
   }
 
-  async function connectJoinAndSync(): Promise<void> {
+  function assertActive(): void {
     if (isStopped) {
       throw new Error("Project realtime session is stopped.");
     }
+  }
+
+  async function connectJoinAndSync(): Promise<void> {
+    assertActive();
 
     if (operationPromise) {
       return operationPromise;
@@ -64,12 +68,20 @@ export function createProjectRealtimeSession({
 
       try {
         await client.start();
+        assertActive();
         await client.invoke("JoinProject", projectId);
+        assertActive();
         hasJoined = true;
         await resync();
+        assertActive();
         publish({ error: null, isReady: true, status: client.getStatus() });
       } catch (error) {
         const sessionError = toError(error);
+
+        if (isStopped) {
+          throw sessionError;
+        }
+
         publish({ error: sessionError, isReady: false, status: client.getStatus() });
         onError?.(sessionError);
         throw sessionError;
@@ -86,7 +98,9 @@ export function createProjectRealtimeSession({
       status === "connected" && previousTransportStatus === "reconnecting" && hasJoined;
     previousTransportStatus = status;
 
-    if (status === "reconnecting" || status === "disconnected") {
+    if (status === "reconnecting") {
+      publish({ ...snapshot, error: null, isReady: false, status });
+    } else if (status === "disconnected") {
       publish({ ...snapshot, isReady: false, status });
     } else {
       publish({ ...snapshot, status });
@@ -102,6 +116,16 @@ export function createProjectRealtimeSession({
       return snapshot;
     },
     retry() {
+      const canRetry =
+        snapshot.status === "disconnected" ||
+        (snapshot.status === "connected" && snapshot.error !== null);
+
+      if (!canRetry) {
+        return Promise.reject(
+          new Error(`Cannot retry realtime session while status is '${snapshot.status}'.`),
+        );
+      }
+
       return connectJoinAndSync();
     },
     start() {
