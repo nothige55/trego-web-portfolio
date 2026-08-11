@@ -1,6 +1,5 @@
 import { create } from "zustand";
 
-import { applyPlannerDrop } from "@/features/planner/dnd/apply-planner-drop";
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import type {
   PlannerNode,
@@ -174,13 +173,32 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
     set({ expandedIds: new Set(rootPathId ? [rootPathId] : []) });
   },
   moveNode(pathId, destination) {
-    set((state) => ({
-      tree: applyPlannerDrop(state.tree, pathId, destination),
-      selectedItemId: pathId,
-      mapFocusRequest: null,
-      multiSelectedIds: [],
-      selectionRangeIds: [],
-    }));
+    set((state) => {
+      if (!state.tree.entityMap.has(pathId)) {
+        return state;
+      }
+
+      // 레거시 Planner처럼 드롭한 클라이언트는 원본 노드를 먼저 갱신해 즉시 반영한다.
+      // 이후 같은 payload의 optimistic reducer와 sender echo는 idempotent no-op이 된다.
+      const nodes = state.nodes.map((node) =>
+        node.pathId === pathId
+          ? {
+              ...node,
+              parentPathId: destination.parentPathId,
+              position: destination.position,
+            }
+          : node,
+      );
+
+      return {
+        nodes,
+        tree: buildPlannerTree(nodes),
+        selectedItemId: pathId,
+        mapFocusRequest: null,
+        multiSelectedIds: [],
+        selectionRangeIds: [],
+      };
+    });
   },
   activateItem(pathId) {
     const currentItem = get().tree.entityMap.get(pathId);

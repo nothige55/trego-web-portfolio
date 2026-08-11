@@ -26,6 +26,7 @@ interface TestContext {
   readonly projectUpdates: PlannerProjectUpdate[];
   readonly reportError: ReturnType<typeof vi.fn>;
   readonly resync: ReturnType<typeof vi.fn>;
+  readonly setNodes: ReturnType<typeof vi.fn>;
   readonly state: { nodes: readonly PlannerNode[] };
 }
 
@@ -43,15 +44,16 @@ function setup(invokeImplementation: () => Promise<void> = () => Promise.resolve
   const projectUpdates: PlannerProjectUpdate[] = [];
   const reportError = vi.fn();
   const resync = vi.fn(() => Promise.resolve());
+  const setNodes = vi.fn((nodes: readonly PlannerNode[]) => {
+    state.nodes = nodes;
+  });
   const transport: PlannerHubTransport = {
     invoke: invoke as PlannerHubTransport["invoke"],
     on: on as PlannerHubTransport["on"],
   };
   const actions: PlannerRealtimeActions = {
     getNodes: () => state.nodes,
-    setNodes: (nodes) => {
-      state.nodes = nodes;
-    },
+    setNodes,
     applyProjectUpdate: (update) => projectUpdates.push(update),
     reportError,
     resync,
@@ -67,6 +69,7 @@ function setup(invokeImplementation: () => Promise<void> = () => Promise.resolve
     projectUpdates,
     reportError,
     resync,
+    setNodes,
     state,
   };
 }
@@ -222,6 +225,40 @@ describe("createPlannerRealtime commands", () => {
       travelTime: 22,
       travelDistance: 1500,
     });
+  });
+
+  it("skips duplicate state writes when a local move and sender echo already match", async () => {
+    const context = setup();
+    context.state.nodes = [
+      {
+        kind: "folder",
+        id: "folder-id",
+        name: "Moved",
+        folderType: "default",
+        pathId: "folder-path",
+        parentPathId: "target-path",
+        position: 0.2,
+      },
+    ];
+    context.adapter.subscribe();
+
+    await context.adapter.commands.updatePath({
+      pathId: "folder-path",
+      parentPathId: "target-path",
+      position: 0.2,
+    });
+    context.emit("OnPathUpdated", {
+      pathId: "folder-path",
+      parentPathId: "target-path",
+      position: 0.2,
+    });
+
+    expect(context.invoke).toHaveBeenCalledWith("UpdatePath", {
+      pathId: "folder-path",
+      parentPathId: "target-path",
+      position: 0.2,
+    });
+    expect(context.setNodes).not.toHaveBeenCalled();
   });
 
   it("exposes all typed planner commands with their exact Hub method names", async () => {

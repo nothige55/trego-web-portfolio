@@ -17,6 +17,7 @@ import {
   PlannerBreadcrumb,
 } from "@/features/planner/components/planner-breadcrumb";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
+import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import { calculatePlannerDragFootprintHeight } from "@/features/planner/dnd/resolve-planner-drop";
 import { usePlannerDragAndDrop } from "@/features/planner/dnd/use-planner-drag-and-drop";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
@@ -64,6 +65,7 @@ function PlannerTreeItem({
   isChildTarget,
   isExpandingTarget,
   isSiblingDropActive,
+  isSortable,
   suppressSelectionHighlight,
 }: {
   readonly node: FlattenedPlannerNode;
@@ -73,6 +75,7 @@ function PlannerTreeItem({
   readonly isChildTarget: boolean;
   readonly isExpandingTarget: boolean;
   readonly isSiblingDropActive: boolean;
+  readonly isSortable: boolean;
   readonly suppressSelectionHighlight: boolean;
 }) {
   const entityMap = usePlannerViewStore((state) => state.tree.entityMap);
@@ -86,6 +89,7 @@ function PlannerTreeItem({
   const selectItem = usePlannerViewStore((state) => state.selectItem);
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     id: node.pathId,
+    disabled: !isSortable,
   });
   const hasChildren = (childrenMap.get(node.pathId) ?? []).length > 0;
   const isExpanded = expandedIds.has(node.pathId);
@@ -119,7 +123,9 @@ function PlannerTreeItem({
       aria-selected={isSelected}
       data-selection-state={isSelected ? "selected" : isSelectionContext ? "range" : undefined}
       data-drop-state={isChildTarget ? "child" : isExpandingTarget ? "expanding" : undefined}
-      className="relative cursor-grab touch-none list-none active:cursor-grabbing"
+      className={`relative touch-none list-none ${
+        isSortable ? "cursor-grab active:cursor-grabbing" : "cursor-default"
+      }`}
       style={{
         opacity: isDragging ? 0 : 1,
         transform: CSS.Transform.toString(isSiblingDropActive ? transform : null),
@@ -209,7 +215,17 @@ function PlannerTreeItem({
   );
 }
 
-export function PlannerSchedulePanel() {
+export type PlannerNodeMoveHandler = (
+  pathId: PlannerNodePathId,
+  destination: Readonly<PlannerDropDestination>,
+) => void;
+
+type PlannerSchedulePanelProps = {
+  readonly isNodeMoveEnabled: boolean;
+  readonly onMoveNode: PlannerNodeMoveHandler;
+};
+
+export function PlannerSchedulePanel({ isNodeMoveEnabled, onMoveNode }: PlannerSchedulePanelProps) {
   const projectDetails = usePlannerViewStore((state) => state.projectDetails);
   const tree = usePlannerViewStore((state) => state.tree);
   const rootPathId = usePlannerViewStore((state) => state.rootPathId);
@@ -217,7 +233,6 @@ export function PlannerSchedulePanel() {
   const collapseAll = usePlannerViewStore((state) => state.collapseAll);
   const clearSelection = usePlannerViewStore((state) => state.clearSelection);
   const expandNode = usePlannerViewStore((state) => state.expandNode);
-  const moveNode = usePlannerViewStore((state) => state.moveNode);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<PlannerNodePathId, HTMLLIElement>());
   const [topItemId, setTopItemId] = useState<PlannerNodePathId | null>(null);
@@ -248,6 +263,14 @@ export function PlannerSchedulePanel() {
   const renderedItems = useMemo(
     () => visibleItems.filter((item) => item.pathId !== rootPathId),
     [rootPathId, visibleItems],
+  );
+  const moveNode = useCallback<PlannerNodeMoveHandler>(
+    (pathId, destination) => {
+      if (isNodeMoveEnabled) {
+        onMoveNode(pathId, destination);
+      }
+    },
+    [isNodeMoveEnabled, onMoveNode],
   );
   const {
     activePathId,
@@ -456,6 +479,7 @@ export function PlannerSchedulePanel() {
                       isChildTarget={childTargetPathId === node.pathId}
                       isExpandingTarget={expandingTargetPathId === node.pathId}
                       isSiblingDropActive={isSiblingDropActive}
+                      isSortable={isNodeMoveEnabled}
                       suppressSelectionHighlight={activePathId !== null}
                       itemRef={(element) => {
                         if (element) {

@@ -22,8 +22,13 @@ import {
   type CursorPresenceController,
 } from "@/features/collaboration/realtime/cursor-presence-controller";
 import { getProjectDetails, getProjectNodes } from "@/features/planner/api/project-api";
+import type { PlannerNodeMoveHandler } from "@/features/planner/components/planner-schedule-panel";
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
-import { createPlannerRealtime } from "@/features/planner/realtime/planner-realtime";
+import {
+  createPlannerRealtime,
+  type PlannerRealtimeCommands,
+} from "@/features/planner/realtime/planner-realtime";
+import type { UpdatePathInput } from "@/features/planner/realtime/project-hub-planner-contracts";
 import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import { ProjectMemberInviteForm } from "@/features/project-management/components/project-member-invite-form";
@@ -70,6 +75,7 @@ export function ProjectPlannerPage({
   const projectRequestIdRef = useRef(0);
   const projectDataRequestRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null);
   const historyRequestRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null);
+  const plannerCommandsRef = useRef<PlannerRealtimeCommands | null>(null);
   const messages = messageState.projectId === projectId ? messageState.messages : [];
   const authorizedRestClient = useMemo(
     () =>
@@ -195,6 +201,7 @@ export function ProjectPlannerPage({
           setFeatureError(error instanceof Error ? error : new Error(String(error))),
         resync,
       });
+      plannerCommandsRef.current = plannerRealtime.commands;
       const unsubscribePlanner = plannerRealtime.subscribe();
       const unsubscribeChat = subscribeToChatMessages(client, {
         onMessageReceived: (message) => {
@@ -218,6 +225,9 @@ export function ProjectPlannerPage({
       setPresenceController(controller);
 
       return () => {
+        if (plannerCommandsRef.current === plannerRealtime.commands) {
+          plannerCommandsRef.current = null;
+        }
         unsubscribePlanner();
         unsubscribeChat();
         controller.dispose();
@@ -225,6 +235,26 @@ export function ProjectPlannerPage({
     },
     [identity.id, projectId, resync],
   );
+
+  const updatePlannerPath = useCallback(async (input: UpdatePathInput): Promise<void> => {
+    const commands = plannerCommandsRef.current;
+
+    if (!commands) {
+      const error = new Error("Planner 실시간 명령을 사용할 수 없습니다.");
+      setFeatureError(error);
+      throw error;
+    }
+
+    setFeatureError(null);
+
+    try {
+      await commands.updatePath(input);
+    } catch (error) {
+      // adapter의 canonical resync가 끝난 뒤에도 사용자가 실패 원인을 확인할 수 있게 남긴다.
+      setFeatureError(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }, []);
 
   return (
     <ProjectRealtimeProvider
@@ -249,6 +279,7 @@ export function ProjectPlannerPage({
         }
         projectId={projectId}
         restClient={authorizedRestClient}
+        updatePlannerPath={updatePlannerPath}
       />
     </ProjectRealtimeProvider>
   );
@@ -264,6 +295,7 @@ type ProjectPlannerPageContentProps = {
   readonly projectDataState: ProjectDataState;
   readonly projectId: string;
   readonly restClient: ApiClient;
+  readonly updatePlannerPath: (input: UpdatePathInput) => Promise<void>;
 };
 
 function ProjectPlannerPageContent({
@@ -276,13 +308,42 @@ function ProjectPlannerPageContent({
   projectDataState,
   projectId,
   restClient,
+  updatePlannerPath,
 }: ProjectPlannerPageContentProps) {
   const { client, error: sessionError, isReady } = useProjectRealtime();
+  const [isNodeMovePending, setIsNodeMovePending] = useState(false);
+  const nodeMovePromiseRef = useRef<Promise<void> | null>(null);
   const sendMessage = useMemo(() => createSendChatMessageCommand(client), [client]);
   const handleSend = useCallback(
     (content: string): Promise<SendChatMessageResult> =>
       sendMessage({ content, memberId: identity.id, projectId }),
     [identity.id, projectId, sendMessage],
+  );
+  const handleMoveNode = useCallback<PlannerNodeMoveHandler>(
+    (pathId, destination) => {
+      if (!isReady || nodeMovePromiseRef.current) {
+        return;
+      }
+
+      usePlannerViewStore.getState().moveNode(pathId, destination);
+      const movePromise = updatePlannerPath({
+        pathId,
+        parentPathId: destination.parentPathId,
+        position: destination.position,
+      });
+      nodeMovePromiseRef.current = movePromise;
+      setIsNodeMovePending(true);
+
+      void movePromise
+        .catch(() => undefined)
+        .finally(() => {
+          if (nodeMovePromiseRef.current === movePromise) {
+            nodeMovePromiseRef.current = null;
+            setIsNodeMovePending(false);
+          }
+        });
+    },
+    [isReady, updatePlannerPath],
   );
 
   if (projectDataState.status !== "ready") {
@@ -324,6 +385,8 @@ function ProjectPlannerPageContent({
         </div>
       ) : null}
       <PlannerWorkspace
+        isNodeMoveEnabled={isReady && !isNodeMovePending}
+        onMoveNode={handleMoveNode}
         projectId={projectId}
         chatContent={
           <RealtimeChatPanel

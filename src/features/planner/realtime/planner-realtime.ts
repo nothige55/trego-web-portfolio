@@ -136,12 +136,15 @@ export function createPlannerRealtime(
     name: TName,
     payload: PlannerHubEventMap[TName],
   ): void {
-    actions.setNodes(
-      reducePlannerHubEvent(actions.getNodes(), {
-        name,
-        payload,
-      } as Parameters<typeof reducePlannerHubEvent>[1]),
-    );
+    const currentNodes = actions.getNodes();
+    const nextNodes = reducePlannerHubEvent(currentNodes, {
+      name,
+      payload,
+    } as Parameters<typeof reducePlannerHubEvent>[1]);
+
+    if (nextNodes !== currentNodes) {
+      actions.setNodes(nextNodes);
+    }
   }
 
   function subscribeNodeEvent<TName extends Exclude<PlannerHubEventName, "OnProjectDateUpdated">>(

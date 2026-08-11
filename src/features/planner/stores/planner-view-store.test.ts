@@ -136,6 +136,10 @@ describe("usePlannerViewStore", () => {
       parentPathId: "day-one",
       position: 0.15,
     });
+    expect(state.nodes.find((node) => node.pathId === "wish-udo")).toMatchObject({
+      parentPathId: "day-one",
+      position: 0.15,
+    });
     expect(state.tree.childrenMap.get("day-one")?.map((node) => node.pathId)).toContain("wish-udo");
     expect(state.selectedItemId).toBe("wish-udo");
     expect(state.multiSelectedIds).toEqual([]);

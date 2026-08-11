@@ -1,11 +1,16 @@
 import { lazy, type ReactNode, Suspense } from "react";
 
 import { PlannerModulePanel } from "@/features/planner/components/planner-module-panel";
-import { PlannerSchedulePanel } from "@/features/planner/components/planner-schedule-panel";
+import {
+  type PlannerNodeMoveHandler,
+  PlannerSchedulePanel,
+} from "@/features/planner/components/planner-schedule-panel";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 
 type PlannerWorkspaceProps = {
   readonly chatContent?: ReactNode;
+  readonly isNodeMoveEnabled: boolean;
+  readonly onMoveNode: PlannerNodeMoveHandler;
   readonly projectId: string;
 };
 
@@ -31,7 +36,12 @@ function PlannerMapModuleLoading() {
 
 // Planner route의 최상위 조합 컴포넌트다.
 // 일정, 보조 모듈, 지도 영역을 배치하되 각 영역의 세부 동작은 하위 컴포넌트가 소유한다.
-export function PlannerWorkspace({ chatContent, projectId }: PlannerWorkspaceProps) {
+export function PlannerWorkspace({
+  chatContent,
+  isNodeMoveEnabled,
+  onMoveNode,
+  projectId,
+}: PlannerWorkspaceProps) {
   const isModuleCollapsed = usePlannerViewStore((state) => state.isModuleCollapsed);
 
   return (
@@ -40,7 +50,7 @@ export function PlannerWorkspace({ chatContent, projectId }: PlannerWorkspacePro
       data-project-id={projectId}
       className="flex h-svh min-w-240 overflow-hidden bg-[#f6f6f7] text-foreground"
     >
-      <PlannerSchedulePanel />
+      <PlannerSchedulePanel isNodeMoveEnabled={isNodeMoveEnabled} onMoveNode={onMoveNode} />
       {/* 접힌 패널은 DOM에서도 제거해 남은 공간을 지도 영역이 모두 사용하게 한다. */}
       {isModuleCollapsed ? null : <PlannerModulePanel chatContent={chatContent} />}
       <Suspense fallback={<PlannerMapModuleLoading />}>
