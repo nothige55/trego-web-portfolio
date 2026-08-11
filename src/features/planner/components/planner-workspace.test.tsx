@@ -39,7 +39,7 @@ describe("PlannerWorkspace", () => {
     const user = userEvent.setup();
     usePlannerViewStore.getState().load(demoPlannerProject.nodes);
     usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
-    render(<PlannerWorkspace projectId="demo" />);
+    render(<PlannerWorkspace isNodeMoveEnabled onMoveNode={vi.fn()} projectId="demo" />);
     await screen.findByRole("main", { name: "여행 일정 플래너" });
     await screen.findByTestId("planner-map-mock");
     return user;
