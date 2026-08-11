@@ -22,7 +22,10 @@ import {
   type CursorPresenceController,
 } from "@/features/collaboration/realtime/cursor-presence-controller";
 import { getProjectDetails, getProjectNodes } from "@/features/planner/api/project-api";
-import type { PlannerNodeMoveHandler } from "@/features/planner/components/planner-schedule-panel";
+import type {
+  PlannerNodeEditingCommands,
+  PlannerNodeMoveHandler,
+} from "@/features/planner/components/planner-schedule-panel";
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
 import {
   createPlannerRealtime,
@@ -236,25 +239,41 @@ export function ProjectPlannerPage({
     [identity.id, projectId, resync],
   );
 
-  const updatePlannerPath = useCallback(async (input: UpdatePathInput): Promise<void> => {
-    const commands = plannerCommandsRef.current;
+  const invokePlannerCommand = useCallback(
+    async (invoke: (commands: PlannerRealtimeCommands) => Promise<void>): Promise<void> => {
+      const commands = plannerCommandsRef.current;
 
-    if (!commands) {
-      const error = new Error("Planner 실시간 명령을 사용할 수 없습니다.");
-      setFeatureError(error);
-      throw error;
-    }
+      if (!commands) {
+        const error = new Error("Planner 실시간 명령을 사용할 수 없습니다.");
+        setFeatureError(error);
+        throw error;
+      }
 
-    setFeatureError(null);
+      setFeatureError(null);
 
-    try {
-      await commands.updatePath(input);
-    } catch (error) {
-      // adapter의 canonical resync가 끝난 뒤에도 사용자가 실패 원인을 확인할 수 있게 남긴다.
-      setFeatureError(error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    }
-  }, []);
+      try {
+        await invoke(commands);
+      } catch (error) {
+        // adapter의 canonical resync가 끝난 뒤에도 사용자가 실패 원인을 확인할 수 있게 남긴다.
+        setFeatureError(error instanceof Error ? error : new Error(String(error)));
+        throw error;
+      }
+    },
+    [],
+  );
+  const updatePlannerPath = useCallback(
+    (input: UpdatePathInput): Promise<void> =>
+      invokePlannerCommand((commands) => commands.updatePath(input)),
+    [invokePlannerCommand],
+  );
+  const plannerNodeEditingCommands = useMemo<PlannerNodeEditingCommands>(
+    () => ({
+      deleteNode: (input) => invokePlannerCommand((commands) => commands.deleteNode(input)),
+      updateDay: (input) => invokePlannerCommand((commands) => commands.updateDay(input)),
+      updateFolder: (input) => invokePlannerCommand((commands) => commands.updateFolder(input)),
+    }),
+    [invokePlannerCommand],
+  );
 
   return (
     <ProjectRealtimeProvider
@@ -271,6 +290,7 @@ export function ProjectPlannerPage({
         identity={identity}
         loadChatHistory={loadChatHistory}
         messages={messages}
+        plannerNodeEditingCommands={plannerNodeEditingCommands}
         presenceController={presenceController}
         projectDataState={
           projectDataState.projectId === projectId
@@ -291,6 +311,7 @@ type ProjectPlannerPageContentProps = {
   readonly identity: AuthSession;
   readonly loadChatHistory: () => Promise<void>;
   readonly messages: readonly ChatMessage[];
+  readonly plannerNodeEditingCommands: PlannerNodeEditingCommands;
   readonly presenceController: CursorPresenceController | null;
   readonly projectDataState: ProjectDataState;
   readonly projectId: string;
@@ -304,6 +325,7 @@ function ProjectPlannerPageContent({
   identity,
   loadChatHistory,
   messages,
+  plannerNodeEditingCommands,
   presenceController,
   projectDataState,
   projectId,
@@ -387,6 +409,7 @@ function ProjectPlannerPageContent({
       <PlannerWorkspace
         isNodeMoveEnabled={isReady && !isNodeMovePending}
         onMoveNode={handleMoveNode}
+        plannerCommands={isReady ? plannerNodeEditingCommands : undefined}
         projectId={projectId}
         chatContent={
           <RealtimeChatPanel

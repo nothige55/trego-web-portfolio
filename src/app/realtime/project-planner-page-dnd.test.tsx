@@ -2,7 +2,10 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectPlannerPage } from "@/app/realtime/project-planner-page";
-import type { PlannerNodeMoveHandler } from "@/features/planner/components/planner-schedule-panel";
+import type {
+  PlannerNodeEditingCommands,
+  PlannerNodeMoveHandler,
+} from "@/features/planner/components/planner-schedule-panel";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { ApiClient } from "@/lib/api-client";
 import type { SignalRClient, SignalRConnectionStatus } from "@/lib/signalr-client";
@@ -12,23 +15,47 @@ vi.mock("@/features/planner/components/planner-workspace", () => ({
   PlannerWorkspace: ({
     isNodeMoveEnabled,
     onMoveNode,
+    plannerCommands,
   }: {
     isNodeMoveEnabled: boolean;
     onMoveNode: PlannerNodeMoveHandler;
+    plannerCommands?: PlannerNodeEditingCommands;
   }) => (
-    <button
-      type="button"
-      disabled={!isNodeMoveEnabled}
-      onClick={() =>
-        onMoveNode("activity-path", {
-          parentPathId: "target-day-path",
-          siblingIndex: 0,
-          position: 0.1,
-        })
-      }
-    >
-      일정 이동
-    </button>
+    <>
+      <button
+        type="button"
+        disabled={!isNodeMoveEnabled}
+        onClick={() =>
+          onMoveNode("activity-path", {
+            parentPathId: "target-day-path",
+            siblingIndex: 0,
+            position: 0.1,
+          })
+        }
+      >
+        일정 이동
+      </button>
+      <button
+        type="button"
+        disabled={!plannerCommands}
+        onClick={() =>
+          void plannerCommands?.updateDay({
+            id: "source-day-id",
+            name: "Renamed source",
+            color: "#123456",
+          })
+        }
+      >
+        Day 수정
+      </button>
+      <button
+        type="button"
+        disabled={!plannerCommands}
+        onClick={() => void plannerCommands?.deleteNode({ pathId: "source-day-path" })}
+      >
+        Day 삭제
+      </button>
+    </>
   ),
 }));
 
@@ -244,5 +271,44 @@ describe("ProjectPlannerPage DnD realtime", () => {
     expect(
       signalR.invoke.mock.calls.filter(([methodName]) => methodName === "UpdatePath"),
     ).toHaveLength(1);
+  });
+
+  it("shares the connected planner adapter with node editing commands", async () => {
+    const signalR = createSignalRClient();
+    const user = userEvent.setup();
+    render(
+      <ProjectPlannerPage
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "member-id",
+          name: "One",
+        }}
+        projectId="project-id"
+        restClient={createRestClient().client}
+      />,
+    );
+
+    const updateButton = await screen.findByRole("button", { name: "Day 수정" });
+    const deleteButton = screen.getByRole("button", { name: "Day 삭제" });
+    await waitFor(() => expect(updateButton).toBeEnabled());
+    expect(deleteButton).toBeEnabled();
+
+    await user.click(updateButton);
+    expect(signalR.invoke).toHaveBeenCalledWith("UpdateDay", {
+      id: "source-day-id",
+      name: "Renamed source",
+      color: "#123456",
+    });
+    expect(
+      usePlannerViewStore.getState().nodes.find((node) => node.pathId === "source-day-path"),
+    ).toMatchObject({ name: "Renamed source", color: "#123456" });
+
+    await user.click(deleteButton);
+    expect(signalR.invoke).toHaveBeenCalledWith("DeleteNode", { pathId: "source-day-path" });
+    expect(
+      usePlannerViewStore.getState().nodes.find((node) => node.pathId === "source-day-path"),
+    ).toBeUndefined();
   });
 });

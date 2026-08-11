@@ -10,8 +10,10 @@ type PlannerNodeLabelProps = {
   readonly dayNumber?: number;
   readonly className?: string;
   readonly titleClassName?: string;
+  readonly nameContent?: ReactNode;
   readonly trailing?: ReactNode;
   readonly onClick?: MouseEventHandler<HTMLButtonElement>;
+  readonly onDoubleClick?: MouseEventHandler<HTMLButtonElement>;
 };
 
 // 트리 행, breadcrumb, 루트 경계 라벨이 같은 아이콘·간격·타이포그래피를 사용한다.
@@ -21,13 +23,17 @@ export function PlannerNodeLabel({
   dayNumber,
   className,
   titleClassName,
+  nameContent,
   trailing,
   onClick,
+  onDoubleClick,
 }: PlannerNodeLabelProps) {
   const content = (
     <>
       <PlannerNodeIcon node={node} parent={parent} dayNumber={dayNumber} />
-      <span className={cn("truncate font-medium", titleClassName)}>{node.name}</span>
+      {nameContent ?? (
+        <span className={cn("truncate font-medium", titleClassName)}>{node.name}</span>
+      )}
       {trailing}
     </>
   );
@@ -38,7 +44,12 @@ export function PlannerNodeLabel({
 
   if (onClick) {
     return (
-      <button type="button" className={labelClassName} onClick={onClick}>
+      <button
+        type="button"
+        className={labelClassName}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+      >
         {content}
       </button>
     );

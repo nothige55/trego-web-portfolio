@@ -7,19 +7,35 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown, ChevronRight, ListChevronsDownUp } from "lucide-react";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ListChevronsDownUp,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { DayMapVisibilityToggle } from "@/features/planner/components/day-map-visibility-toggle";
 import {
   PLANNER_BREADCRUMB_HEIGHT,
   PlannerBreadcrumb,
 } from "@/features/planner/components/planner-breadcrumb";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
+import { PLANNER_DAY_COLORS } from "@/features/planner/data/planner-day-colors";
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import { calculatePlannerDragFootprintHeight } from "@/features/planner/dnd/resolve-planner-drop";
 import { usePlannerDragAndDrop } from "@/features/planner/dnd/use-planner-drag-and-drop";
+import type { PlannerRealtimeCommands } from "@/features/planner/realtime/planner-realtime";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type {
   FlattenedPlannerNode,
@@ -34,6 +50,11 @@ const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
   month: "2-digit",
   day: "2-digit",
 });
+const VISIBLE_DAY_COLOR_COUNT = 4;
+
+function modulo(value: number, divisor: number): number {
+  return ((value % divisor) + divisor) % divisor;
+}
 
 function formatDateRange(startDate: string, endDate: string): string {
   return `${dateFormatter.format(new Date(startDate))} – ${dateFormatter.format(new Date(endDate))}`;
@@ -67,6 +88,13 @@ function PlannerTreeItem({
   isSiblingDropActive,
   isSortable,
   suppressSelectionHighlight,
+  commands,
+  editingPathId,
+  editingName,
+  onBeginEditing,
+  onCancelEditing,
+  onEditingNameChange,
+  onCommitName,
 }: {
   readonly node: FlattenedPlannerNode;
   readonly dayNumber?: number;
@@ -77,6 +105,13 @@ function PlannerTreeItem({
   readonly isSiblingDropActive: boolean;
   readonly isSortable: boolean;
   readonly suppressSelectionHighlight: boolean;
+  readonly commands?: PlannerNodeEditingCommands;
+  readonly editingPathId: PlannerNodePathId | null;
+  readonly editingName: string;
+  readonly onBeginEditing: (node: FlattenedPlannerNode) => void;
+  readonly onCancelEditing: () => void;
+  readonly onEditingNameChange: (name: string) => void;
+  readonly onCommitName: (node: FlattenedPlannerNode) => void;
 }) {
   const entityMap = usePlannerViewStore((state) => state.tree.entityMap);
   const childrenMap = usePlannerViewStore((state) => state.tree.childrenMap);
@@ -87,6 +122,9 @@ function PlannerTreeItem({
   const toggleExpanded = usePlannerViewStore((state) => state.toggleExpanded);
   const activateItem = usePlannerViewStore((state) => state.activateItem);
   const selectItem = usePlannerViewStore((state) => state.selectItem);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const currentDayColorIndex = PLANNER_DAY_COLORS.findIndex((color) => color === node.color);
+  const [dayColorStartIndex, setDayColorStartIndex] = useState(currentDayColorIndex);
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     id: node.pathId,
     disabled: !isSortable,
@@ -109,6 +147,23 @@ function PlannerTreeItem({
   // 기존 Planner와 같이 root 다음 계층부터 30px 단위로 들여쓴다.
   // 별도의 20px 토글 칸을 항상 유지해 자식 유무와 관계없이 라벨 시작점을 맞춘다.
   const indentation = Math.max(0, node.depth - 1) * 30;
+  const isEditing = editingPathId === node.pathId;
+  const canRename = node.kind === "folder" || node.kind === "day";
+
+  useEffect(() => {
+    if (!isEditing) {
+      return;
+    }
+
+    nameInputRef.current?.focus();
+    nameInputRef.current?.select();
+  }, [isEditing]);
+
+  const visibleDayColors = Array.from(
+    { length: VISIBLE_DAY_COLOR_COUNT },
+    (_, offset) =>
+      PLANNER_DAY_COLORS[modulo(dayColorStartIndex + offset, PLANNER_DAY_COLORS.length)],
+  );
 
   return (
     <li
@@ -149,68 +204,185 @@ function PlannerTreeItem({
           />
         </div>
       ) : null}
-      <div
-        className={`group flex min-h-9 items-center border-l-2 transition-colors ${
-          isChildTarget
-            ? "planner-child-drop-fill border-brand text-foreground"
-            : isExpandingTarget
-              ? "border-brand/60 bg-brand/5 text-foreground"
-              : isSelectedHighlightVisible
-                ? "border-brand bg-brand/10 text-foreground"
-                : isSelectionContextHighlightVisible
-                  ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
-                  : "border-transparent text-foreground hover:bg-muted/70"
-        }`}
-        style={{ paddingLeft: indentation }}
+      <ContextMenu
+        onOpenChange={(isOpen) => {
+          if (isOpen) {
+            setDayColorStartIndex(currentDayColorIndex);
+          }
+        }}
       >
-        <span className="flex h-9 w-5 shrink-0 items-center justify-center">
-          {hasChildren ? (
-            <button
-              type="button"
-              aria-label={`${node.name} ${isExpanded ? "접기" : "펼치기"}`}
-              className="flex h-9 w-5 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
-              onClick={(event) => {
-                event.stopPropagation();
-                toggleExpanded(node.pathId);
-              }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
+        <ContextMenuTrigger
+          render={
+            <div
+              className={`group flex h-9 items-center border-l-2 transition-colors ${
+                isChildTarget
+                  ? "planner-child-drop-fill border-brand text-foreground"
+                  : isExpandingTarget
+                    ? "border-brand/60 bg-brand/5 text-foreground"
+                    : isSelectedHighlightVisible
+                      ? "border-brand bg-brand/10 text-foreground"
+                      : isSelectionContextHighlightVisible
+                        ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
+                        : "border-transparent text-foreground hover:bg-muted/70"
+              }`}
+              style={{ paddingLeft: indentation }}
+            />
+          }
+        >
+          <span className="flex h-9 w-5 shrink-0 items-center justify-center">
+            {hasChildren ? (
+              <button
+                type="button"
+                aria-label={`${node.name} ${isExpanded ? "접기" : "펼치기"}`}
+                className="flex h-9 w-5 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleExpanded(node.pathId);
+                }}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                }}
+              >
+                {isExpanded ? (
+                  <ChevronDown aria-hidden="true" className="size-4" />
+                ) : (
+                  <ChevronRight aria-hidden="true" className="size-4" />
+                )}
+              </button>
+            ) : null}
+          </span>
+          <PlannerNodeLabel
+            node={node}
+            dayNumber={dayNumber}
+            parent={node.parentPathId ? entityMap.get(node.parentPathId) : undefined}
+            className="flex-1 py-2.5 pr-2"
+            nameContent={
+              isEditing ? (
+                <span className="relative min-w-0 flex-1">
+                  <span aria-hidden="true" className="invisible block truncate font-medium">
+                    {node.name || "\u00a0"}
+                  </span>
+                  <input
+                    ref={nameInputRef}
+                    aria-label={`${node.name} 이름`}
+                    value={editingName}
+                    className="absolute -inset-y-2 right-0 -left-2 h-[30px] min-w-0 rounded-lg bg-brand/10 px-2 text-sm leading-none font-medium ring-1 ring-brand outline-none ring-inset"
+                    onBlur={onCancelEditing}
+                    onChange={(event) => onEditingNameChange(event.target.value)}
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      event.stopPropagation();
+
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        onCommitName(node);
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        onCancelEditing();
+                      }
+                    }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                  />
+                </span>
+              ) : undefined
+            }
+            onClick={
+              isEditing
+                ? undefined
+                : (event) => {
+                    if (event.shiftKey) {
+                      // 범위 선택은 선택 상태만 바꾸고 지도 카메라는 이동하지 않는다.
+                      selectItem(node.pathId, true);
+                      return;
+                    }
+
+                    activateItem(node.pathId);
+                  }
+            }
+            onDoubleClick={
+              commands && canRename
+                ? (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onBeginEditing(node);
+                  }
+                : undefined
+            }
+            trailing={
+              node.kind === "activity" && node.startTime ? (
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                  {node.startTime}
+                </span>
+              ) : null
+            }
+          />
+          {node.kind === "day" ? (
+            <DayMapVisibilityToggle dayPathId={node.pathId} dayName={node.name} />
+          ) : null}
+        </ContextMenuTrigger>
+        {commands ? (
+          <ContextMenuContent className="z-100">
+            {canRename ? (
+              <ContextMenuItem onClick={() => onBeginEditing(node)}>
+                <Pencil aria-hidden="true" />
+                이름 변경
+              </ContextMenuItem>
+            ) : null}
+            {node.kind === "day" ? (
+              <div aria-label="Day 색상 선택" className="flex items-center gap-1 p-1" role="group">
+                <ContextMenuItem
+                  aria-label="이전 Day 색상"
+                  className="size-8 justify-center rounded-full p-1"
+                  closeOnClick={false}
+                  onClick={() => setDayColorStartIndex((current) => current - 1)}
+                >
+                  <ChevronLeft aria-hidden="true" />
+                </ContextMenuItem>
+                <div className="flex items-center gap-2">
+                  {visibleDayColors.map((color) => (
+                    <ContextMenuItem
+                      key={color}
+                      aria-label={`색상 ${color} 선택`}
+                      className="size-6 justify-center p-1"
+                      closeOnClick={false}
+                      onClick={() => {
+                        void commands
+                          .updateDay({ id: node.id, name: node.name, color })
+                          .catch(() => undefined);
+                      }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`size-4 rounded-sm ${node.color === color ? "ring-2 ring-foreground ring-offset-1" : ""}`}
+                        style={{ backgroundColor: color }}
+                      />
+                    </ContextMenuItem>
+                  ))}
+                </div>
+                <ContextMenuItem
+                  aria-label="다음 Day 색상"
+                  className="size-8 justify-center rounded-full p-1"
+                  closeOnClick={false}
+                  onClick={() => setDayColorStartIndex((current) => current + 1)}
+                >
+                  <ChevronRight aria-hidden="true" />
+                </ContextMenuItem>
+              </div>
+            ) : null}
+            {canRename ? <ContextMenuSeparator /> : null}
+            <ContextMenuItem
+              variant="destructive"
+              onClick={() => {
+                void commands.deleteNode({ pathId: node.pathId }).catch(() => undefined);
               }}
             >
-              {isExpanded ? (
-                <ChevronDown aria-hidden="true" className="size-4" />
-              ) : (
-                <ChevronRight aria-hidden="true" className="size-4" />
-              )}
-            </button>
-          ) : null}
-        </span>
-        <PlannerNodeLabel
-          node={node}
-          dayNumber={dayNumber}
-          parent={node.parentPathId ? entityMap.get(node.parentPathId) : undefined}
-          className="flex-1 py-2.5 pr-2"
-          onClick={(event) => {
-            if (event.shiftKey) {
-              // 범위 선택은 선택 상태만 바꾸고 지도 카메라는 이동하지 않는다.
-              selectItem(node.pathId, true);
-              return;
-            }
-
-            activateItem(node.pathId);
-          }}
-          trailing={
-            node.kind === "activity" && node.startTime ? (
-              <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                {node.startTime}
-              </span>
-            ) : null
-          }
-        />
-        {node.kind === "day" ? (
-          <DayMapVisibilityToggle dayPathId={node.pathId} dayName={node.name} />
+              <Trash2 aria-hidden="true" />
+              삭제
+            </ContextMenuItem>
+          </ContextMenuContent>
         ) : null}
-      </div>
+      </ContextMenu>
     </li>
   );
 }
@@ -220,12 +392,22 @@ export type PlannerNodeMoveHandler = (
   destination: Readonly<PlannerDropDestination>,
 ) => void;
 
+export type PlannerNodeEditingCommands = Pick<
+  PlannerRealtimeCommands,
+  "deleteNode" | "updateDay" | "updateFolder"
+>;
+
 type PlannerSchedulePanelProps = {
+  readonly commands?: PlannerNodeEditingCommands;
   readonly isNodeMoveEnabled: boolean;
   readonly onMoveNode: PlannerNodeMoveHandler;
 };
 
-export function PlannerSchedulePanel({ isNodeMoveEnabled, onMoveNode }: PlannerSchedulePanelProps) {
+export function PlannerSchedulePanel({
+  commands,
+  isNodeMoveEnabled,
+  onMoveNode,
+}: PlannerSchedulePanelProps) {
   const projectDetails = usePlannerViewStore((state) => state.projectDetails);
   const tree = usePlannerViewStore((state) => state.tree);
   const rootPathId = usePlannerViewStore((state) => state.rootPathId);
@@ -237,6 +419,41 @@ export function PlannerSchedulePanel({ isNodeMoveEnabled, onMoveNode }: PlannerS
   const itemRefs = useRef(new Map<PlannerNodePathId, HTMLLIElement>());
   const [topItemId, setTopItemId] = useState<PlannerNodePathId | null>(null);
   const [dragFootprintHeight, setDragFootprintHeight] = useState(0);
+  const [editingPathId, setEditingPathId] = useState<PlannerNodePathId | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const beginEditing = (node: FlattenedPlannerNode): void => {
+    setEditingPathId(node.pathId);
+    setEditingName(node.name);
+  };
+  const cancelEditing = (): void => {
+    setEditingPathId(null);
+    setEditingName("");
+  };
+  const commitName = (node: FlattenedPlannerNode): void => {
+    if (!commands) {
+      cancelEditing();
+      return;
+    }
+
+    const nextName = editingName;
+    cancelEditing();
+
+    if (nextName === node.name) {
+      return;
+    }
+
+    const operation =
+      node.kind === "folder"
+        ? commands.updateFolder({
+            id: node.id,
+            name: nextName,
+            folderType: node.folderType ?? "default",
+          })
+        : node.kind === "day"
+          ? commands.updateDay({ id: node.id, name: nextName, color: node.color ?? "#F44336" })
+          : Promise.resolve();
+    void operation.catch(() => undefined);
+  };
   const visibleItems = useMemo(
     () => getVisiblePlannerNodes(tree.flattenedItems, expandedIds, tree.childrenMap),
     [expandedIds, tree.childrenMap, tree.flattenedItems],
@@ -481,6 +698,13 @@ export function PlannerSchedulePanel({ isNodeMoveEnabled, onMoveNode }: PlannerS
                       isSiblingDropActive={isSiblingDropActive}
                       isSortable={isNodeMoveEnabled}
                       suppressSelectionHighlight={activePathId !== null}
+                      commands={commands}
+                      editingPathId={editingPathId}
+                      editingName={editingName}
+                      onBeginEditing={beginEditing}
+                      onCancelEditing={cancelEditing}
+                      onEditingNameChange={setEditingName}
+                      onCommitName={commitName}
                       itemRef={(element) => {
                         if (element) {
                           itemRefs.current.set(node.pathId, element);
