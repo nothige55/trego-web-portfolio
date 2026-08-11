@@ -2,6 +2,7 @@ import { lazy, type ReactNode, Suspense } from "react";
 
 import { PlannerModulePanel } from "@/features/planner/components/planner-module-panel";
 import {
+  type PlannerNodeEditingCommands,
   type PlannerNodeMoveHandler,
   PlannerSchedulePanel,
 } from "@/features/planner/components/planner-schedule-panel";
@@ -11,6 +12,7 @@ type PlannerWorkspaceProps = {
   readonly chatContent?: ReactNode;
   readonly isNodeMoveEnabled: boolean;
   readonly onMoveNode: PlannerNodeMoveHandler;
+  readonly plannerCommands?: PlannerNodeEditingCommands;
   readonly projectId: string;
 };
 
@@ -40,6 +42,7 @@ export function PlannerWorkspace({
   chatContent,
   isNodeMoveEnabled,
   onMoveNode,
+  plannerCommands,
   projectId,
 }: PlannerWorkspaceProps) {
   const isModuleCollapsed = usePlannerViewStore((state) => state.isModuleCollapsed);
@@ -50,7 +53,11 @@ export function PlannerWorkspace({
       data-project-id={projectId}
       className="flex h-svh min-w-240 overflow-hidden bg-[#f6f6f7] text-foreground"
     >
-      <PlannerSchedulePanel isNodeMoveEnabled={isNodeMoveEnabled} onMoveNode={onMoveNode} />
+      <PlannerSchedulePanel
+        commands={plannerCommands}
+        isNodeMoveEnabled={isNodeMoveEnabled}
+        onMoveNode={onMoveNode}
+      />
       {/* 접힌 패널은 DOM에서도 제거해 남은 공간을 지도 영역이 모두 사용하게 한다. */}
       {isModuleCollapsed ? null : <PlannerModulePanel chatContent={chatContent} />}
       <Suspense fallback={<PlannerMapModuleLoading />}>
