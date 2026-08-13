@@ -28,14 +28,6 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { DayMapVisibilityToggle } from "@/features/planner/components/day-map-visibility-toggle";
 import {
   PLANNER_BREADCRUMB_HEIGHT,
@@ -99,10 +91,17 @@ function PlannerTreeItem({
   commands,
   editingPathId,
   editingName,
+  isMemoEditing,
+  isMemoSubmitting,
+  memoDraft,
+  memoError,
   onBeginEditing,
+  onCancelMemoEditing,
   onCancelEditing,
   onEditingNameChange,
   onCommitName,
+  onMemoDraftChange,
+  onSaveMemo,
 }: {
   readonly node: FlattenedPlannerNode;
   readonly dayNumber?: number;
@@ -116,10 +115,17 @@ function PlannerTreeItem({
   readonly commands?: PlannerNodeEditingCommands;
   readonly editingPathId: PlannerNodePathId | null;
   readonly editingName: string;
+  readonly isMemoEditing: boolean;
+  readonly isMemoSubmitting: boolean;
+  readonly memoDraft: string;
+  readonly memoError: string | null;
   readonly onBeginEditing: (node: FlattenedPlannerNode) => void;
+  readonly onCancelMemoEditing: () => void;
   readonly onCancelEditing: () => void;
   readonly onEditingNameChange: (name: string) => void;
   readonly onCommitName: (node: FlattenedPlannerNode) => void;
+  readonly onMemoDraftChange: (memo: string) => void;
+  readonly onSaveMemo: () => Promise<void>;
 }) {
   const entityMap = usePlannerViewStore((state) => state.tree.entityMap);
   const childrenMap = usePlannerViewStore((state) => state.tree.childrenMap);
@@ -411,6 +417,74 @@ function PlannerTreeItem({
           </ContextMenuContent>
         ) : null}
       </ContextMenu>
+      {node.kind === "activity" && (node.memo || isMemoEditing) ? (
+        <div
+          className="border-l-2 border-transparent pr-2 pb-2"
+          style={{ paddingLeft: indentation + 44 }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {isMemoEditing ? (
+            <div className="space-y-1.5">
+              <textarea
+                autoFocus
+                aria-label="Activity 메모"
+                className="min-h-20 w-full resize-y rounded-md border bg-background px-2.5 py-2 text-xs leading-relaxed outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                disabled={isMemoSubmitting}
+                value={memoDraft}
+                onChange={(event) => onMemoDraftChange(event.target.value)}
+                onKeyDown={(event) => {
+                  event.stopPropagation();
+
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    onCancelMemoEditing();
+                  } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                    event.preventDefault();
+                    void onSaveMemo();
+                  }
+                }}
+              />
+              {memoError ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {memoError}
+                </p>
+              ) : null}
+              <div className="flex justify-end gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={isMemoSubmitting}
+                  onClick={onCancelMemoEditing}
+                >
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  size="xs"
+                  disabled={isMemoSubmitting}
+                  onClick={() => void onSaveMemo()}
+                >
+                  {isMemoSubmitting ? "저장 중…" : "저장"}
+                </Button>
+              </div>
+            </div>
+          ) : commands ? (
+            <button
+              type="button"
+              aria-label={`${node.name} 메모 편집`}
+              className="block w-full text-left text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground hover:text-foreground"
+              onClick={() => commands.editActivityMemo?.(node.pathId)}
+            >
+              {node.memo}
+            </button>
+          ) : (
+            <p className="text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
+              {node.memo}
+            </p>
+          )}
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -463,6 +537,8 @@ export function PlannerSchedulePanel({
   const [editingName, setEditingName] = useState("");
   const [memoEditingPathId, setMemoEditingPathId] = useState<PlannerNodePathId | null>(null);
   const [memoDraft, setMemoDraft] = useState("");
+  const [memoError, setMemoError] = useState<string | null>(null);
+  const [isMemoSubmitting, setIsMemoSubmitting] = useState(false);
   const historyPastCount = usePlannerHistoryStore((state) => state.past.length);
   const historyFutureCount = usePlannerHistoryStore((state) => state.future.length);
   const isHistoryReplaying = usePlannerHistoryStore((state) => state.isReplaying);
@@ -505,6 +581,30 @@ export function PlannerSchedulePanel({
     if (node?.kind !== "activity") return;
     setMemoEditingPathId(pathId);
     setMemoDraft(node.memo ?? "");
+    setMemoError(null);
+  };
+  const cancelMemoEditing = (): void => {
+    setMemoEditingPathId(null);
+    setMemoDraft("");
+    setMemoError(null);
+  };
+  const saveMemo = async (): Promise<void> => {
+    if (!commands || memoEditingNode?.kind !== "activity") return;
+
+    setIsMemoSubmitting(true);
+    setMemoError(null);
+    try {
+      await commands.updateActivity({
+        id: memoEditingNode.id,
+        name: memoEditingNode.name,
+        memo: memoDraft.trim() || null,
+      });
+      cancelMemoEditing();
+    } catch {
+      setMemoError("메모를 저장하지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsMemoSubmitting(false);
+    }
   };
   const commandBindings = commands ? { ...commands, editActivityMemo: openMemoEditor } : undefined;
   const visibleItems = useMemo(
@@ -846,10 +946,17 @@ export function PlannerSchedulePanel({
                       commands={commandBindings}
                       editingPathId={editingPathId}
                       editingName={editingName}
+                      isMemoEditing={memoEditingPathId === node.pathId}
+                      isMemoSubmitting={isMemoSubmitting}
+                      memoDraft={memoEditingPathId === node.pathId ? memoDraft : ""}
+                      memoError={memoEditingPathId === node.pathId ? memoError : null}
                       onBeginEditing={beginEditing}
+                      onCancelMemoEditing={cancelMemoEditing}
                       onCancelEditing={cancelEditing}
                       onEditingNameChange={setEditingName}
                       onCommitName={commitName}
+                      onMemoDraftChange={setMemoDraft}
+                      onSaveMemo={saveMemo}
                       itemRef={(element) => {
                         if (element) {
                           itemRefs.current.set(node.pathId, element);
@@ -892,44 +999,6 @@ export function PlannerSchedulePanel({
           />
         </div>
       </div>
-      <Dialog
-        open={Boolean(memoEditingNode)}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setMemoEditingPathId(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Activity 메모</DialogTitle>
-            <DialogDescription>{memoEditingNode?.name}</DialogDescription>
-          </DialogHeader>
-          <textarea
-            autoFocus
-            aria-label="Activity 메모"
-            className="min-h-32 resize-y rounded-lg border bg-background px-3 py-2 text-sm"
-            value={memoDraft}
-            onChange={(event) => setMemoDraft(event.target.value)}
-          />
-          <DialogFooter>
-            <Button
-              type="button"
-              onClick={() => {
-                if (!commands || memoEditingNode?.kind !== "activity") return;
-                setMemoEditingPathId(null);
-                void commands
-                  .updateActivity({
-                    id: memoEditingNode.id,
-                    name: memoEditingNode.name,
-                    memo: memoDraft.trim() || null,
-                  })
-                  .catch(() => undefined);
-              }}
-            >
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </aside>
   );
 }

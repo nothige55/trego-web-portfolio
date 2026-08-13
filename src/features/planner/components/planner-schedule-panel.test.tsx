@@ -4,7 +4,7 @@ import type { PlannerNodeEditingCommands } from "@/features/planner/components/p
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
 import { demoPlannerProject } from "@/features/planner/data/demo-planner";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
-import { fireEvent, render, screen, userEvent, within } from "@/testing/test-utils";
+import { fireEvent, render, screen, userEvent, waitFor, within } from "@/testing/test-utils";
 
 const dndState = vi.hoisted(() => ({
   activePathId: null as string | null,
@@ -322,6 +322,9 @@ describe("PlannerSchedulePanel", () => {
     );
     const tree = await screen.findByRole("tree", { name: "여행 일정" });
     await user.click(within(tree).getByRole("button", { name: "가보고 싶은 곳 펼치기" }));
+    expect(within(tree).getByRole("button", { name: "우도 메모 편집" })).toHaveTextContent(
+      "날씨가 좋으면 배편 확인",
+    );
 
     await user.dblClick(within(tree).getByRole("button", { name: "우도" }));
     expect(within(tree).queryByRole("textbox", { name: "우도 이름" })).not.toBeInTheDocument();
@@ -339,6 +342,71 @@ describe("PlannerSchedulePanel", () => {
       name: "우도",
       memo: "배편 먼저 예약",
     });
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: "Activity 메모" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("cancels inline memo editing with Escape", async () => {
+    const commands = createPlannerCommands();
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(
+      <PlannerWorkspace
+        isNodeMoveEnabled
+        onMoveNode={vi.fn()}
+        plannerCommands={commands}
+        projectId="demo"
+      />,
+    );
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+    await user.click(within(tree).getByRole("button", { name: "가보고 싶은 곳 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "우도 메모 편집" }));
+
+    const memoInput = screen.getByRole("textbox", { name: "Activity 메모" });
+    await user.clear(memoInput);
+    await user.type(memoInput, "취소할 메모");
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("textbox", { name: "Activity 메모" })).not.toBeInTheDocument();
+    expect(commands.updateActivity).not.toHaveBeenCalled();
+    expect(within(tree).getByRole("button", { name: "우도 메모 편집" })).toHaveTextContent(
+      "날씨가 좋으면 배편 확인",
+    );
+  });
+
+  it("keeps the memo draft open when saving fails", async () => {
+    const commands = {
+      ...createPlannerCommands(),
+      updateActivity: vi.fn().mockRejectedValue(new Error("save failed")),
+    };
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(
+      <PlannerWorkspace
+        isNodeMoveEnabled
+        onMoveNode={vi.fn()}
+        plannerCommands={commands}
+        projectId="demo"
+      />,
+    );
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+    await user.click(within(tree).getByRole("button", { name: "가보고 싶은 곳 펼치기" }));
+    fireEvent.contextMenu(within(tree).getByRole("button", { name: "우도" }));
+    await user.click(await screen.findByRole("menuitem", { name: "메모 편집" }));
+
+    const memoInput = screen.getByRole("textbox", { name: "Activity 메모" });
+    await user.clear(memoInput);
+    await user.type(memoInput, "배편 먼저 예약");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "메모를 저장하지 못했습니다. 다시 시도해 주세요.",
+    );
+    expect(memoInput).toHaveValue("배편 먼저 예약");
+    expect(screen.getByRole("textbox", { name: "Activity 메모" })).toBeInTheDocument();
   });
 
   it("creates a date at the trip root without exposing a parent selector", async () => {

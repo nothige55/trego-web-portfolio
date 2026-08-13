@@ -74,6 +74,18 @@ vi.mock("@/features/planner/components/planner-workspace", () => ({
       >
         날짜 변경
       </button>
+      <button
+        type="button"
+        disabled={!plannerCommands?.updateDateRange}
+        onClick={() =>
+          void plannerCommands?.updateDateRange?.({
+            startDate: "2026-08-01",
+            endDate: "2026-08-01",
+          })
+        }
+      >
+        날짜 축소
+      </button>
     </>
   ),
 }));
@@ -374,6 +386,51 @@ describe("ProjectPlannerPage DnD realtime", () => {
     ).toMatchObject({ name: "Source", color: "#ff0000" });
   });
 
+  it("restores a deleted Day subtree and project dates through undo", async () => {
+    const signalR = createSignalRClient(() => Promise.resolve());
+    const user = userEvent.setup();
+    render(
+      <ProjectPlannerPage
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "member-id",
+          name: "One",
+        }}
+        projectId="project-id"
+        restClient={createRestClient().client}
+      />,
+    );
+
+    const deleteButton = await screen.findByRole("button", { name: "Day 삭제" });
+    await waitFor(() => expect(deleteButton).toBeEnabled());
+    await user.click(deleteButton);
+    signalR.invoke.mockClear();
+    await user.click(screen.getByRole("button", { name: "실행 취소" }));
+
+    await waitFor(() =>
+      expect(signalR.invoke).toHaveBeenCalledWith(
+        "CreateDay",
+        expect.objectContaining({ id: "source-day-id", pathId: "source-day-path" }),
+      ),
+    );
+    expect(signalR.invoke).toHaveBeenCalledWith(
+      "CreateActivity",
+      expect.objectContaining({ id: "activity-id", parentPathId: "source-day-path" }),
+    );
+    expect(signalR.invoke).toHaveBeenCalledWith(
+      "UpdateProject",
+      expect.objectContaining({ publicId: "project-id", endDate: "2026-08-03" }),
+    );
+    expect(
+      usePlannerViewStore.getState().nodes.find((node) => node.pathId === "source-day-path"),
+    ).toBeDefined();
+    expect(
+      usePlannerViewStore.getState().nodes.find((node) => node.pathId === "activity-path"),
+    ).toBeDefined();
+  });
+
   it("reconciles project dates and Day nodes through sequential SignalR commands", async () => {
     const signalR = createSignalRClient(() => Promise.resolve());
     const user = userEvent.setup();
@@ -408,5 +465,44 @@ describe("ProjectPlannerPage DnD realtime", () => {
       false,
     );
     expect(signalR.invoke.mock.calls.some(([methodName]) => methodName === "CreateDay")).toBe(true);
+  });
+
+  it("restores a Day removed by date-range shrink through undo", async () => {
+    const signalR = createSignalRClient(() => Promise.resolve());
+    const user = userEvent.setup();
+    render(
+      <ProjectPlannerPage
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "member-id",
+          name: "One",
+        }}
+        projectId="project-id"
+        restClient={createRestClient().client}
+      />,
+    );
+
+    const shrinkButton = await screen.findByRole("button", { name: "날짜 축소" });
+    await waitFor(() => expect(shrinkButton).toBeEnabled());
+    await user.click(shrinkButton);
+    expect(
+      usePlannerViewStore.getState().nodes.find((node) => node.pathId === "target-day-path"),
+    ).toBeUndefined();
+
+    signalR.invoke.mockClear();
+    await user.click(screen.getByRole("button", { name: "실행 취소" }));
+
+    await waitFor(() =>
+      expect(signalR.invoke).toHaveBeenCalledWith(
+        "CreateDay",
+        expect.objectContaining({ id: "target-day-id", pathId: "target-day-path" }),
+      ),
+    );
+    expect(
+      usePlannerViewStore.getState().nodes.find((node) => node.pathId === "target-day-path"),
+    ).toBeDefined();
+    expect(usePlannerViewStore.getState().projectDetails?.endDate).toBe("2026-08-03");
   });
 });
