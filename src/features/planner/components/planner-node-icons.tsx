@@ -13,13 +13,15 @@ type PlannerCalendarIconProps = IconSizeProps & {
 
 export function PlannerCalendarIcon({ size = 16, color, dayNumber }: PlannerCalendarIconProps) {
   const calendarColor = color || "#F44336";
+  const displayedDayNumber =
+    dayNumber !== "" && Number.isFinite(Number(dayNumber)) ? dayNumber : "";
 
   return (
     <svg
       aria-hidden="true"
       data-planner-icon="calendar"
       data-color={calendarColor}
-      data-number={dayNumber}
+      data-number={displayedDayNumber}
       width={size}
       height={size}
       viewBox="5 3 38 39"
@@ -45,7 +47,7 @@ export function PlannerCalendarIcon({ size = 16, color, dayNumber }: PlannerCale
         textAnchor="middle"
         dominantBaseline="middle"
       >
-        {dayNumber}
+        {displayedDayNumber}
       </text>
     </svg>
   );

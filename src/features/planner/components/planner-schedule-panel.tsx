@@ -11,9 +11,12 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Group,
   ListChevronsDownUp,
   Pencil,
+  Redo2,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -30,12 +33,17 @@ import {
   PLANNER_BREADCRUMB_HEIGHT,
   PlannerBreadcrumb,
 } from "@/features/planner/components/planner-breadcrumb";
+import { PlannerDateRangePopover } from "@/features/planner/components/planner-date-range-popover";
+import { PlannerNodeCreateDialog } from "@/features/planner/components/planner-node-create-dialog";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
 import { PLANNER_DAY_COLORS } from "@/features/planner/data/planner-day-colors";
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import { calculatePlannerDragFootprintHeight } from "@/features/planner/dnd/resolve-planner-drop";
 import { usePlannerDragAndDrop } from "@/features/planner/dnd/use-planner-drag-and-drop";
+import type { PlannerDateRangeInput } from "@/features/planner/operations/planner-date-range";
+import type { PlannerCreateNodeDraft } from "@/features/planner/operations/planner-operations";
 import type { PlannerRealtimeCommands } from "@/features/planner/realtime/planner-realtime";
+import { usePlannerHistoryStore } from "@/features/planner/stores/planner-history-store";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type {
   FlattenedPlannerNode,
@@ -46,18 +54,10 @@ import { getVisiblePlannerNodes } from "@/features/planner/utils/get-visible-pla
 
 // 이 파일은 일정 트리의 표시와 사용자 입력만 담당한다.
 // 트리 생성, visible item 계산, 계층 선택 규칙은 각각 store와 순수 함수에 둔다.
-const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
-  month: "2-digit",
-  day: "2-digit",
-});
 const VISIBLE_DAY_COLOR_COUNT = 4;
 
 function modulo(value: number, divisor: number): number {
   return ((value % divisor) + divisor) % divisor;
-}
-
-function formatDateRange(startDate: string, endDate: string): string {
-  return `${dateFormatter.format(new Date(startDate))} – ${dateFormatter.format(new Date(endDate))}`;
 }
 
 function hasSelectedAncestor(
@@ -91,10 +91,17 @@ function PlannerTreeItem({
   commands,
   editingPathId,
   editingName,
+  isMemoEditing,
+  isMemoSubmitting,
+  memoDraft,
+  memoError,
   onBeginEditing,
+  onCancelMemoEditing,
   onCancelEditing,
   onEditingNameChange,
   onCommitName,
+  onMemoDraftChange,
+  onSaveMemo,
 }: {
   readonly node: FlattenedPlannerNode;
   readonly dayNumber?: number;
@@ -108,10 +115,17 @@ function PlannerTreeItem({
   readonly commands?: PlannerNodeEditingCommands;
   readonly editingPathId: PlannerNodePathId | null;
   readonly editingName: string;
+  readonly isMemoEditing: boolean;
+  readonly isMemoSubmitting: boolean;
+  readonly memoDraft: string;
+  readonly memoError: string | null;
   readonly onBeginEditing: (node: FlattenedPlannerNode) => void;
+  readonly onCancelMemoEditing: () => void;
   readonly onCancelEditing: () => void;
   readonly onEditingNameChange: (name: string) => void;
   readonly onCommitName: (node: FlattenedPlannerNode) => void;
+  readonly onMemoDraftChange: (memo: string) => void;
+  readonly onSaveMemo: () => Promise<void>;
 }) {
   const entityMap = usePlannerViewStore((state) => state.tree.entityMap);
   const childrenMap = usePlannerViewStore((state) => state.tree.childrenMap);
@@ -149,6 +163,9 @@ function PlannerTreeItem({
   const indentation = Math.max(0, node.depth - 1) * 30;
   const isEditing = editingPathId === node.pathId;
   const canRename = node.kind === "folder" || node.kind === "day";
+  const operationPathIds = multiSelectedIds.includes(node.pathId)
+    ? multiSelectedIds
+    : [node.pathId];
 
   useEffect(() => {
     if (!isEditing) {
@@ -329,6 +346,20 @@ function PlannerTreeItem({
                 이름 변경
               </ContextMenuItem>
             ) : null}
+            {node.kind === "activity" ? (
+              <ContextMenuItem onClick={() => commands.editActivityMemo?.(node.pathId)}>
+                <Pencil aria-hidden="true" />
+                메모 편집
+              </ContextMenuItem>
+            ) : null}
+            {operationPathIds.length >= 2 && commands.groupNodes ? (
+              <ContextMenuItem
+                onClick={() => void commands.groupNodes?.(operationPathIds).catch(() => undefined)}
+              >
+                <Group aria-hidden="true" />
+                선택 일정 그룹화
+              </ContextMenuItem>
+            ) : null}
             {node.kind === "day" ? (
               <div aria-label="Day 색상 선택" className="flex items-center gap-1 p-1" role="group">
                 <ContextMenuItem
@@ -374,15 +405,86 @@ function PlannerTreeItem({
             <ContextMenuItem
               variant="destructive"
               onClick={() => {
-                void commands.deleteNode({ pathId: node.pathId }).catch(() => undefined);
+                const operation = commands.deleteNodes
+                  ? commands.deleteNodes(operationPathIds)
+                  : commands.deleteNode({ pathId: node.pathId });
+                void operation.catch(() => undefined);
               }}
             >
               <Trash2 aria-hidden="true" />
-              삭제
+              {operationPathIds.length > 1 ? `${operationPathIds.length}개 삭제` : "삭제"}
             </ContextMenuItem>
           </ContextMenuContent>
         ) : null}
       </ContextMenu>
+      {node.kind === "activity" && (node.memo || isMemoEditing) ? (
+        <div
+          className="border-l-2 border-transparent pr-2 pb-2"
+          style={{ paddingLeft: indentation + 44 }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {isMemoEditing ? (
+            <div className="space-y-1.5">
+              <textarea
+                autoFocus
+                aria-label="Activity 메모"
+                className="min-h-20 w-full resize-y rounded-md border bg-background px-2.5 py-2 text-xs leading-relaxed outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                disabled={isMemoSubmitting}
+                value={memoDraft}
+                onChange={(event) => onMemoDraftChange(event.target.value)}
+                onKeyDown={(event) => {
+                  event.stopPropagation();
+
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    onCancelMemoEditing();
+                  } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                    event.preventDefault();
+                    void onSaveMemo();
+                  }
+                }}
+              />
+              {memoError ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {memoError}
+                </p>
+              ) : null}
+              <div className="flex justify-end gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={isMemoSubmitting}
+                  onClick={onCancelMemoEditing}
+                >
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  size="xs"
+                  disabled={isMemoSubmitting}
+                  onClick={() => void onSaveMemo()}
+                >
+                  {isMemoSubmitting ? "저장 중…" : "저장"}
+                </Button>
+              </div>
+            </div>
+          ) : commands ? (
+            <button
+              type="button"
+              aria-label={`${node.name} 메모 편집`}
+              className="block w-full text-left text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground hover:text-foreground"
+              onClick={() => commands.editActivityMemo?.(node.pathId)}
+            >
+              {node.memo}
+            </button>
+          ) : (
+            <p className="text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
+              {node.memo}
+            </p>
+          )}
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -394,8 +496,17 @@ export type PlannerNodeMoveHandler = (
 
 export type PlannerNodeEditingCommands = Pick<
   PlannerRealtimeCommands,
-  "deleteNode" | "updateDay" | "updateFolder"
->;
+  "deleteNode" | "updateActivity" | "updateDay" | "updateFolder"
+> & {
+  readonly createNode?: (draft: PlannerCreateNodeDraft) => Promise<void>;
+  readonly deleteNodes?: (pathIds: readonly PlannerNodePathId[]) => Promise<void>;
+  readonly editActivityMemo?: (pathId: PlannerNodePathId) => void;
+  readonly extendDateRange?: () => Promise<void>;
+  readonly groupNodes?: (pathIds: readonly PlannerNodePathId[]) => Promise<void>;
+  readonly redo?: () => Promise<void>;
+  readonly undo?: () => Promise<void>;
+  readonly updateDateRange?: (input: PlannerDateRangeInput) => Promise<void>;
+};
 
 type PlannerSchedulePanelProps = {
   readonly commands?: PlannerNodeEditingCommands;
@@ -410,7 +521,10 @@ export function PlannerSchedulePanel({
 }: PlannerSchedulePanelProps) {
   const projectDetails = usePlannerViewStore((state) => state.projectDetails);
   const tree = usePlannerViewStore((state) => state.tree);
+  const nodes = usePlannerViewStore((state) => state.nodes);
   const rootPathId = usePlannerViewStore((state) => state.rootPathId);
+  const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
+  const multiSelectedIds = usePlannerViewStore((state) => state.multiSelectedIds);
   const expandedIds = usePlannerViewStore((state) => state.expandedIds);
   const collapseAll = usePlannerViewStore((state) => state.collapseAll);
   const clearSelection = usePlannerViewStore((state) => state.clearSelection);
@@ -421,6 +535,14 @@ export function PlannerSchedulePanel({
   const [dragFootprintHeight, setDragFootprintHeight] = useState(0);
   const [editingPathId, setEditingPathId] = useState<PlannerNodePathId | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [memoEditingPathId, setMemoEditingPathId] = useState<PlannerNodePathId | null>(null);
+  const [memoDraft, setMemoDraft] = useState("");
+  const [memoError, setMemoError] = useState<string | null>(null);
+  const [isMemoSubmitting, setIsMemoSubmitting] = useState(false);
+  const historyPastCount = usePlannerHistoryStore((state) => state.past.length);
+  const historyFutureCount = usePlannerHistoryStore((state) => state.future.length);
+  const isHistoryReplaying = usePlannerHistoryStore((state) => state.isReplaying);
+  const memoEditingNode = memoEditingPathId ? tree.entityMap.get(memoEditingPathId) : undefined;
   const beginEditing = (node: FlattenedPlannerNode): void => {
     setEditingPathId(node.pathId);
     setEditingName(node.name);
@@ -435,12 +557,14 @@ export function PlannerSchedulePanel({
       return;
     }
 
-    const nextName = editingName;
+    const nextName = editingName.trim();
     cancelEditing();
 
-    if (nextName === node.name) {
+    if (!nextName || nextName === node.name) {
       return;
     }
+
+    if (node.kind === "activity") return;
 
     const operation =
       node.kind === "folder"
@@ -449,17 +573,47 @@ export function PlannerSchedulePanel({
             name: nextName,
             folderType: node.folderType ?? "default",
           })
-        : node.kind === "day"
-          ? commands.updateDay({ id: node.id, name: nextName, color: node.color ?? "#F44336" })
-          : Promise.resolve();
+        : commands.updateDay({ id: node.id, name: nextName, color: node.color ?? "#F44336" });
     void operation.catch(() => undefined);
   };
+  const openMemoEditor = (pathId: PlannerNodePathId): void => {
+    const node = tree.entityMap.get(pathId);
+    if (node?.kind !== "activity") return;
+    setMemoEditingPathId(pathId);
+    setMemoDraft(node.memo ?? "");
+    setMemoError(null);
+  };
+  const cancelMemoEditing = (): void => {
+    setMemoEditingPathId(null);
+    setMemoDraft("");
+    setMemoError(null);
+  };
+  const saveMemo = async (): Promise<void> => {
+    if (!commands || memoEditingNode?.kind !== "activity") return;
+
+    setIsMemoSubmitting(true);
+    setMemoError(null);
+    try {
+      await commands.updateActivity({
+        id: memoEditingNode.id,
+        name: memoEditingNode.name,
+        memo: memoDraft.trim() || null,
+      });
+      cancelMemoEditing();
+    } catch {
+      setMemoError("메모를 저장하지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsMemoSubmitting(false);
+    }
+  };
+  const commandBindings = commands ? { ...commands, editActivityMemo: openMemoEditor } : undefined;
   const visibleItems = useMemo(
     () => getVisiblePlannerNodes(tree.flattenedItems, expandedIds, tree.childrenMap),
     [expandedIds, tree.childrenMap, tree.flattenedItems],
   );
   const dayNumberByPathId = useMemo(() => {
-    const startDate = new Date(`${projectDetails?.startDate ?? "1970-01-01"}T00:00:00Z`);
+    const startDateValue = projectDetails?.startDate.slice(0, 10) ?? "1970-01-01";
+    const startDate = new Date(`${startDateValue}T00:00:00Z`);
     const dayNumbers = new Map<PlannerNodePathId, number>();
     let dayOffset = 0;
 
@@ -481,6 +635,56 @@ export function PlannerSchedulePanel({
     () => visibleItems.filter((item) => item.pathId !== rootPathId),
     [rootPathId, visibleItems],
   );
+  const operationPathIds = useMemo(
+    () => (multiSelectedIds.length > 0 ? multiSelectedIds : selectedItemId ? [selectedItemId] : []),
+    [multiSelectedIds, selectedItemId],
+  );
+  useEffect(() => {
+    const handlePlannerKeyDown = (event: KeyboardEvent): void => {
+      const target = event.target;
+      const isTextInput =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+      if (isTextInput || event.isComposing) return;
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        const historyCommand = event.shiftKey ? commands?.redo : commands?.undo;
+        if (!historyCommand) return;
+        event.preventDefault();
+        void historyCommand().catch(() => undefined);
+        return;
+      }
+
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "g" &&
+        operationPathIds.length >= 2 &&
+        commands?.groupNodes
+      ) {
+        event.preventDefault();
+        void commands.groupNodes(operationPathIds).catch(() => undefined);
+        return;
+      }
+
+      if ((event.key === "Delete" || event.key === "Backspace") && operationPathIds.length > 0) {
+        const deleteOperation = commands?.deleteNodes
+          ? () => commands.deleteNodes!(operationPathIds)
+          : operationPathIds.length === 1 && commands?.deleteNode
+            ? () => commands.deleteNode({ pathId: operationPathIds[0]! })
+            : null;
+        if (!deleteOperation) return;
+        event.preventDefault();
+        void deleteOperation().catch(() => undefined);
+        return;
+      }
+
+      if (event.key === "Escape") clearSelection();
+    };
+
+    window.addEventListener("keydown", handlePlannerKeyDown);
+    return () => window.removeEventListener("keydown", handlePlannerKeyDown);
+  }, [clearSelection, commands, operationPathIds]);
   const moveNode = useCallback<PlannerNodeMoveHandler>(
     (pathId, destination) => {
       if (isNodeMoveEnabled) {
@@ -606,33 +810,74 @@ export function PlannerSchedulePanel({
       <header className="border-b px-6 py-4">
         <p className="text-xs font-semibold tracking-wide text-brand">Trego Planner</p>
         <div className="mt-2 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold">{projectDetails.title}</h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              여행 메모와 태그 기능을 준비 중입니다.
-            </p>
-          </div>
-          <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">
-            {formatDateRange(projectDetails.startDate, projectDetails.endDate)}
-          </span>
+          <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{projectDetails.title}</h1>
+          {commands?.updateDateRange ? (
+            <PlannerDateRangePopover
+              nodes={nodes}
+              orderedPathIds={tree.flattenedItems.map((node) => node.pathId)}
+              projectDetails={projectDetails}
+              onUpdate={commands.updateDateRange}
+            />
+          ) : (
+            <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">
+              {projectDetails.startDate.slice(5, 10).replace("-", ".")} –{" "}
+              {projectDetails.endDate.slice(5, 10).replace("-", ".")}
+            </span>
+          )}
         </div>
+        <p className="mt-1 w-full text-xs text-muted-foreground">
+          실시간으로 일정을 함께 편집합니다.
+        </p>
       </header>
 
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-x-0 top-0 z-50 flex h-8 items-center justify-between bg-card px-6 pr-2 text-sm font-medium">
           <span>일정</span>
-          {hasExpandedTopLevelBranch ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-6"
-              aria-label="모든 일정 접기"
-              onClick={collapseAll}
-            >
-              <ListChevronsDownUp aria-hidden="true" className="size-3.5" />
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-0.5">
+            {commands?.undo ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="실행 취소"
+                disabled={historyPastCount === 0 || isHistoryReplaying}
+                onClick={() => void commands.undo?.().catch(() => undefined)}
+              >
+                <Undo2 aria-hidden="true" />
+              </Button>
+            ) : null}
+            {commands?.redo ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="다시 실행"
+                disabled={historyFutureCount === 0 || isHistoryReplaying}
+                onClick={() => void commands.redo?.().catch(() => undefined)}
+              >
+                <Redo2 aria-hidden="true" />
+              </Button>
+            ) : null}
+            {commands?.createNode && commands.extendDateRange && rootPathId ? (
+              <PlannerNodeCreateDialog
+                rootPathId={rootPathId}
+                onCreate={commands.createNode}
+                onExtendDateRange={commands.extendDateRange}
+              />
+            ) : null}
+            {hasExpandedTopLevelBranch ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-6"
+                aria-label="모든 일정 접기"
+                onClick={collapseAll}
+              >
+                <ListChevronsDownUp aria-hidden="true" className="size-3.5" />
+              </Button>
+            ) : null}
+          </div>
         </div>
         <div
           ref={scrollContainerRef}
@@ -666,7 +911,7 @@ export function PlannerSchedulePanel({
                   }
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === "Escape") {
+                  if (event.target === event.currentTarget && event.key === "Escape") {
                     clearSelection();
                   }
                 }}
@@ -698,13 +943,20 @@ export function PlannerSchedulePanel({
                       isSiblingDropActive={isSiblingDropActive}
                       isSortable={isNodeMoveEnabled}
                       suppressSelectionHighlight={activePathId !== null}
-                      commands={commands}
+                      commands={commandBindings}
                       editingPathId={editingPathId}
                       editingName={editingName}
+                      isMemoEditing={memoEditingPathId === node.pathId}
+                      isMemoSubmitting={isMemoSubmitting}
+                      memoDraft={memoEditingPathId === node.pathId ? memoDraft : ""}
+                      memoError={memoEditingPathId === node.pathId ? memoError : null}
                       onBeginEditing={beginEditing}
+                      onCancelMemoEditing={cancelMemoEditing}
                       onCancelEditing={cancelEditing}
                       onEditingNameChange={setEditingName}
                       onCommitName={commitName}
+                      onMemoDraftChange={setMemoDraft}
+                      onSaveMemo={saveMemo}
                       itemRef={(element) => {
                         if (element) {
                           itemRefs.current.set(node.pathId, element);
