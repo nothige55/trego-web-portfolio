@@ -41,12 +41,14 @@ import {
   PLANNER_BREADCRUMB_HEIGHT,
   PlannerBreadcrumb,
 } from "@/features/planner/components/planner-breadcrumb";
+import { PlannerDateRangePopover } from "@/features/planner/components/planner-date-range-popover";
 import { PlannerNodeCreateDialog } from "@/features/planner/components/planner-node-create-dialog";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
 import { PLANNER_DAY_COLORS } from "@/features/planner/data/planner-day-colors";
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import { calculatePlannerDragFootprintHeight } from "@/features/planner/dnd/resolve-planner-drop";
 import { usePlannerDragAndDrop } from "@/features/planner/dnd/use-planner-drag-and-drop";
+import type { PlannerDateRangeInput } from "@/features/planner/operations/planner-date-range";
 import type { PlannerCreateNodeDraft } from "@/features/planner/operations/planner-operations";
 import type { PlannerRealtimeCommands } from "@/features/planner/realtime/planner-realtime";
 import { usePlannerHistoryStore } from "@/features/planner/stores/planner-history-store";
@@ -60,18 +62,10 @@ import { getVisiblePlannerNodes } from "@/features/planner/utils/get-visible-pla
 
 // 이 파일은 일정 트리의 표시와 사용자 입력만 담당한다.
 // 트리 생성, visible item 계산, 계층 선택 규칙은 각각 store와 순수 함수에 둔다.
-const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
-  month: "2-digit",
-  day: "2-digit",
-});
 const VISIBLE_DAY_COLOR_COUNT = 4;
 
 function modulo(value: number, divisor: number): number {
   return ((value % divisor) + divisor) % divisor;
-}
-
-function formatDateRange(startDate: string, endDate: string): string {
-  return `${dateFormatter.format(new Date(startDate))} – ${dateFormatter.format(new Date(endDate))}`;
 }
 
 function hasSelectedAncestor(
@@ -433,9 +427,11 @@ export type PlannerNodeEditingCommands = Pick<
   readonly createNode?: (draft: PlannerCreateNodeDraft) => Promise<void>;
   readonly deleteNodes?: (pathIds: readonly PlannerNodePathId[]) => Promise<void>;
   readonly editActivityMemo?: (pathId: PlannerNodePathId) => void;
+  readonly extendDateRange?: () => Promise<void>;
   readonly groupNodes?: (pathIds: readonly PlannerNodePathId[]) => Promise<void>;
   readonly redo?: () => Promise<void>;
   readonly undo?: () => Promise<void>;
+  readonly updateDateRange?: (input: PlannerDateRangeInput) => Promise<void>;
 };
 
 type PlannerSchedulePanelProps = {
@@ -451,6 +447,7 @@ export function PlannerSchedulePanel({
 }: PlannerSchedulePanelProps) {
   const projectDetails = usePlannerViewStore((state) => state.projectDetails);
   const tree = usePlannerViewStore((state) => state.tree);
+  const nodes = usePlannerViewStore((state) => state.nodes);
   const rootPathId = usePlannerViewStore((state) => state.rootPathId);
   const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
   const multiSelectedIds = usePlannerViewStore((state) => state.multiSelectedIds);
@@ -515,7 +512,8 @@ export function PlannerSchedulePanel({
     [expandedIds, tree.childrenMap, tree.flattenedItems],
   );
   const dayNumberByPathId = useMemo(() => {
-    const startDate = new Date(`${projectDetails?.startDate ?? "1970-01-01"}T00:00:00Z`);
+    const startDateValue = projectDetails?.startDate.slice(0, 10) ?? "1970-01-01";
+    const startDate = new Date(`${startDateValue}T00:00:00Z`);
     const dayNumbers = new Map<PlannerNodePathId, number>();
     let dayOffset = 0;
 
@@ -537,6 +535,56 @@ export function PlannerSchedulePanel({
     () => visibleItems.filter((item) => item.pathId !== rootPathId),
     [rootPathId, visibleItems],
   );
+  const operationPathIds = useMemo(
+    () => (multiSelectedIds.length > 0 ? multiSelectedIds : selectedItemId ? [selectedItemId] : []),
+    [multiSelectedIds, selectedItemId],
+  );
+  useEffect(() => {
+    const handlePlannerKeyDown = (event: KeyboardEvent): void => {
+      const target = event.target;
+      const isTextInput =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+      if (isTextInput || event.isComposing) return;
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        const historyCommand = event.shiftKey ? commands?.redo : commands?.undo;
+        if (!historyCommand) return;
+        event.preventDefault();
+        void historyCommand().catch(() => undefined);
+        return;
+      }
+
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "g" &&
+        operationPathIds.length >= 2 &&
+        commands?.groupNodes
+      ) {
+        event.preventDefault();
+        void commands.groupNodes(operationPathIds).catch(() => undefined);
+        return;
+      }
+
+      if ((event.key === "Delete" || event.key === "Backspace") && operationPathIds.length > 0) {
+        const deleteOperation = commands?.deleteNodes
+          ? () => commands.deleteNodes!(operationPathIds)
+          : operationPathIds.length === 1 && commands?.deleteNode
+            ? () => commands.deleteNode({ pathId: operationPathIds[0]! })
+            : null;
+        if (!deleteOperation) return;
+        event.preventDefault();
+        void deleteOperation().catch(() => undefined);
+        return;
+      }
+
+      if (event.key === "Escape") clearSelection();
+    };
+
+    window.addEventListener("keydown", handlePlannerKeyDown);
+    return () => window.removeEventListener("keydown", handlePlannerKeyDown);
+  }, [clearSelection, commands, operationPathIds]);
   const moveNode = useCallback<PlannerNodeMoveHandler>(
     (pathId, destination) => {
       if (isNodeMoveEnabled) {
@@ -662,14 +710,24 @@ export function PlannerSchedulePanel({
       <header className="border-b px-6 py-4">
         <p className="text-xs font-semibold tracking-wide text-brand">Trego Planner</p>
         <div className="mt-2 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold">{projectDetails.title}</h1>
-            <p className="mt-1 text-xs text-muted-foreground">실시간으로 일정을 함께 편집합니다.</p>
-          </div>
-          <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">
-            {formatDateRange(projectDetails.startDate, projectDetails.endDate)}
-          </span>
+          <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{projectDetails.title}</h1>
+          {commands?.updateDateRange ? (
+            <PlannerDateRangePopover
+              nodes={nodes}
+              orderedPathIds={tree.flattenedItems.map((node) => node.pathId)}
+              projectDetails={projectDetails}
+              onUpdate={commands.updateDateRange}
+            />
+          ) : (
+            <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">
+              {projectDetails.startDate.slice(5, 10).replace("-", ".")} –{" "}
+              {projectDetails.endDate.slice(5, 10).replace("-", ".")}
+            </span>
+          )}
         </div>
+        <p className="mt-1 w-full text-xs text-muted-foreground">
+          실시간으로 일정을 함께 편집합니다.
+        </p>
       </header>
 
       <div className="relative min-h-0 flex-1">
@@ -700,8 +758,12 @@ export function PlannerSchedulePanel({
                 <Redo2 aria-hidden="true" />
               </Button>
             ) : null}
-            {commands?.createNode && rootPathId ? (
-              <PlannerNodeCreateDialog rootPathId={rootPathId} onCreate={commands.createNode} />
+            {commands?.createNode && commands.extendDateRange && rootPathId ? (
+              <PlannerNodeCreateDialog
+                rootPathId={rootPathId}
+                onCreate={commands.createNode}
+                onExtendDateRange={commands.extendDateRange}
+              />
             ) : null}
             {hasExpandedTopLevelBranch ? (
               <Button
@@ -749,40 +811,7 @@ export function PlannerSchedulePanel({
                   }
                 }}
                 onKeyDown={(event) => {
-                  const target = event.target as HTMLElement;
-                  const isTextInput =
-                    target instanceof HTMLInputElement ||
-                    target instanceof HTMLTextAreaElement ||
-                    target.isContentEditable;
-                  if (isTextInput || event.nativeEvent.isComposing) return;
-
-                  const operationPathIds =
-                    multiSelectedIds.length > 0
-                      ? multiSelectedIds
-                      : selectedItemId
-                        ? [selectedItemId]
-                        : [];
-                  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
-                    event.preventDefault();
-                    const operation = event.shiftKey ? commands?.redo?.() : commands?.undo?.();
-                    void operation?.catch(() => undefined);
-                  } else if (
-                    (event.metaKey || event.ctrlKey) &&
-                    event.key.toLowerCase() === "g" &&
-                    operationPathIds.length >= 2
-                  ) {
-                    event.preventDefault();
-                    void commands?.groupNodes?.(operationPathIds).catch(() => undefined);
-                  } else if (event.key === "Delete" && operationPathIds.length > 0) {
-                    event.preventDefault();
-                    const operation = commands?.deleteNodes
-                      ? commands.deleteNodes(operationPathIds)
-                      : operationPathIds.length === 1
-                        ? commands?.deleteNode({ pathId: operationPathIds[0]! })
-                        : undefined;
-                    void operation?.catch(() => undefined);
-                  }
-                  if (event.key === "Escape") {
+                  if (event.target === event.currentTarget && event.key === "Escape") {
                     clearSelection();
                   }
                 }}

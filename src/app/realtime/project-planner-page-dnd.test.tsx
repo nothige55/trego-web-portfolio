@@ -62,6 +62,18 @@ vi.mock("@/features/planner/components/planner-workspace", () => ({
       >
         실행 취소
       </button>
+      <button
+        type="button"
+        disabled={!plannerCommands?.updateDateRange}
+        onClick={() =>
+          void plannerCommands?.updateDateRange?.({
+            startDate: "2026-09-01",
+            endDate: "2026-09-03",
+          })
+        }
+      >
+        날짜 변경
+      </button>
     </>
   ),
 }));
@@ -314,9 +326,17 @@ describe("ProjectPlannerPage DnD realtime", () => {
 
     await user.click(deleteButton);
     expect(signalR.invoke).toHaveBeenCalledWith("DeleteNode", { pathId: "source-day-path" });
+    expect(signalR.invoke).toHaveBeenCalledWith("UpdateProject", {
+      publicId: "project-id",
+      title: "Live project",
+      startDate: "2026-08-01",
+      endDate: "2026-08-01",
+      isPublic: false,
+    });
     expect(
       usePlannerViewStore.getState().nodes.find((node) => node.pathId === "source-day-path"),
     ).toBeUndefined();
+    expect(usePlannerViewStore.getState().projectDetails?.endDate).toBe("2026-08-01");
   });
 
   it("records a confirmed edit and replays its inverse through the same SignalR adapter", async () => {
@@ -352,5 +372,41 @@ describe("ProjectPlannerPage DnD realtime", () => {
     expect(
       usePlannerViewStore.getState().nodes.find((node) => node.pathId === "source-day-path"),
     ).toMatchObject({ name: "Source", color: "#ff0000" });
+  });
+
+  it("reconciles project dates and Day nodes through sequential SignalR commands", async () => {
+    const signalR = createSignalRClient(() => Promise.resolve());
+    const user = userEvent.setup();
+    render(
+      <ProjectPlannerPage
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "member-id",
+          name: "One",
+        }}
+        projectId="project-id"
+        restClient={createRestClient().client}
+      />,
+    );
+
+    const dateButton = await screen.findByRole("button", { name: "날짜 변경" });
+    await waitFor(() => expect(dateButton).toBeEnabled());
+    await user.click(dateButton);
+
+    await waitFor(() =>
+      expect(signalR.invoke).toHaveBeenCalledWith("UpdateProject", {
+        publicId: "project-id",
+        title: "Live project",
+        startDate: "2026-09-01",
+        endDate: "2026-09-03",
+        isPublic: false,
+      }),
+    );
+    expect(signalR.invoke.mock.calls.some(([methodName]) => methodName === "UpdateDay")).toBe(
+      false,
+    );
+    expect(signalR.invoke.mock.calls.some(([methodName]) => methodName === "CreateDay")).toBe(true);
   });
 });

@@ -8,6 +8,7 @@ import type {
   UpdateDayInput,
   UpdateFolderInput,
   UpdatePathInput,
+  UpdateProjectInput,
 } from "@/features/planner/realtime/project-hub-planner-contracts";
 import type { PlannerNode, PlannerNodePathId } from "@/features/planner/types/planner-node";
 
@@ -19,7 +20,8 @@ export type PlannerOperationCommand =
   | Readonly<{ type: "update-activity"; input: UpdateActivityInput }>
   | Readonly<{ type: "update-day"; input: UpdateDayInput }>
   | Readonly<{ type: "update-folder"; input: UpdateFolderInput }>
-  | Readonly<{ type: "update-path"; input: UpdatePathInput }>;
+  | Readonly<{ type: "update-path"; input: UpdatePathInput }>
+  | Readonly<{ type: "update-project"; input: UpdateProjectInput }>;
 
 export async function executePlannerOperationCommands(
   commands: PlannerRealtimeCommands,
@@ -50,6 +52,9 @@ export async function executePlannerOperationCommands(
         break;
       case "update-path":
         await commands.updatePath(operation.input);
+        break;
+      case "update-project":
+        await commands.updateProject(operation.input);
         break;
       default: {
         const exhaustiveCheck: never = operation;

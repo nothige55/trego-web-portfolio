@@ -1,3 +1,4 @@
+import { addDays, format, parseISO } from "date-fns";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectRealtime } from "@/app/realtime/project-realtime-context";
@@ -28,7 +29,11 @@ import type {
 } from "@/features/planner/components/planner-schedule-panel";
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
 import {
-  buildDeleteHistoryOperations,
+  buildPlannerDateRangeHistory,
+  buildPlannerDeleteHistory,
+  type PlannerDateRangeInput,
+} from "@/features/planner/operations/planner-date-range";
+import {
   executePlannerOperationCommands,
   type PlannerOperationCommand,
 } from "@/features/planner/operations/planner-operation-command";
@@ -318,6 +323,24 @@ export function ProjectPlannerPage({
       ),
     [runRecordedOperation],
   );
+  const updatePlannerDateRange = useCallback(
+    async (input: PlannerDateRangeInput): Promise<void> => {
+      const state = usePlannerViewStore.getState();
+      if (!state.projectDetails || !state.rootPathId) {
+        throw new Error("여행 날짜 정보를 불러오지 못했습니다.");
+      }
+
+      const history = buildPlannerDateRangeHistory({
+        input,
+        nodes: state.nodes,
+        orderedPathIds: state.tree.flattenedItems.map((node) => node.pathId),
+        projectDetails: state.projectDetails,
+        rootPathId: state.rootPathId,
+      });
+      await runRecordedOperation("여행 날짜 변경", history.redo, history.undo);
+    },
+    [runRecordedOperation],
+  );
   const plannerNodeEditingCommands = useMemo<PlannerNodeEditingCommands>(
     () => ({
       createNode: async (draft) => {
@@ -333,15 +356,33 @@ export function ProjectPlannerPage({
         );
       },
       deleteNode: async (input) => {
-        const nodes = usePlannerViewStore.getState().nodes;
-        const history = buildDeleteHistoryOperations(nodes, [input.pathId]);
+        const state = usePlannerViewStore.getState();
+        if (!state.projectDetails) throw new Error("여행 날짜 정보를 불러오지 못했습니다.");
+        const history = buildPlannerDeleteHistory({
+          nodes: state.nodes,
+          pathIds: [input.pathId],
+          projectDetails: state.projectDetails,
+        });
         await runRecordedOperation("일정 삭제", history.redo, history.undo);
       },
       deleteNodes: async (pathIds) => {
-        const nodes = usePlannerViewStore.getState().nodes;
-        const normalizedPathIds = normalizeOperationPathIds(nodes, pathIds);
-        const history = buildDeleteHistoryOperations(nodes, normalizedPathIds);
+        const state = usePlannerViewStore.getState();
+        if (!state.projectDetails) throw new Error("여행 날짜 정보를 불러오지 못했습니다.");
+        const normalizedPathIds = normalizeOperationPathIds(state.nodes, pathIds);
+        const history = buildPlannerDeleteHistory({
+          nodes: state.nodes,
+          pathIds: normalizedPathIds,
+          projectDetails: state.projectDetails,
+        });
         await runRecordedOperation("선택 일정 삭제", history.redo, history.undo);
+      },
+      extendDateRange: async () => {
+        const projectDetails = usePlannerViewStore.getState().projectDetails;
+        if (!projectDetails) throw new Error("여행 날짜 정보를 불러오지 못했습니다.");
+        await updatePlannerDateRange({
+          startDate: projectDetails.startDate.slice(0, 10),
+          endDate: format(addDays(parseISO(projectDetails.endDate), 1), "yyyy-MM-dd"),
+        });
       },
       groupNodes: async (pathIds) => {
         const nodes = usePlannerViewStore.getState().nodes;
@@ -435,8 +476,9 @@ export function ProjectPlannerPage({
           ],
         );
       },
+      updateDateRange: updatePlannerDateRange,
     }),
-    [replayHistory, runRecordedOperation],
+    [replayHistory, runRecordedOperation, updatePlannerDateRange],
   );
 
   return (

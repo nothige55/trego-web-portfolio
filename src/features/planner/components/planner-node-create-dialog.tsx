@@ -19,10 +19,15 @@ import type { PlannerNodePathId } from "@/features/planner/types/planner-node";
 
 type PlannerNodeCreateDialogProps = {
   readonly onCreate: (draft: PlannerCreateNodeDraft) => Promise<void>;
+  readonly onExtendDateRange: () => Promise<void>;
   readonly rootPathId: PlannerNodePathId;
 };
 
-export function PlannerNodeCreateDialog({ onCreate, rootPathId }: PlannerNodeCreateDialogProps) {
+export function PlannerNodeCreateDialog({
+  onCreate,
+  onExtendDateRange,
+  rootPathId,
+}: PlannerNodeCreateDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [kind, setKind] = useState<PlannerCreateNodeKind>("day");
   const [name, setName] = useState("");
@@ -39,7 +44,11 @@ export function PlannerNodeCreateDialog({ onCreate, rootPathId }: PlannerNodeCre
     setError(null);
     setIsSubmitting(true);
     try {
-      await onCreate({ kind, name, parentPathId: rootPathId });
+      if (kind === "day") {
+        await onExtendDateRange();
+      } else {
+        await onCreate({ kind, name, parentPathId: rootPathId });
+      }
       reset();
       setIsOpen(false);
     } catch (caughtError) {
@@ -79,16 +88,22 @@ export function PlannerNodeCreateDialog({ onCreate, rootPathId }: PlannerNodeCre
               <option value="wish-folder">위시리스트 폴더</option>
             </select>
           </label>
-          <label className="grid gap-1.5 text-xs font-medium">
-            이름
-            <input
-              autoFocus
-              aria-label="새 일정 이름"
-              className="h-9 rounded-lg border bg-background px-3 text-sm"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </label>
+          {kind === "day" ? (
+            <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+              현재 종료일 다음 날짜를 추가합니다.
+            </p>
+          ) : (
+            <label className="grid gap-1.5 text-xs font-medium">
+              이름
+              <input
+                autoFocus
+                aria-label="새 일정 이름"
+                className="h-9 rounded-lg border bg-background px-3 text-sm"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+          )}
           {error ? (
             <p role="alert" className="text-xs text-destructive">
               {error}
