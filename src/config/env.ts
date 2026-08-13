@@ -1,6 +1,15 @@
 const HTTP_PROTOCOLS = new Set(["http:", "https:"]);
 const DEFAULT_SIGNALR_HUB_PATH = "/project";
 
+export type AiPlannerMode = "api" | "mock";
+
+export function parseAiPlannerMode(value: string | undefined): AiPlannerMode {
+  const mode = value?.trim().toLowerCase();
+  if (!mode) return "mock";
+  if (mode === "api" || mode === "mock") return mode;
+  throw new Error("VITE_AI_PLANNER_MODE must be either 'mock' or 'api'.");
+}
+
 export function parseApiBaseUrl(value: string | undefined): string | undefined {
   const baseUrl = value?.trim();
 
@@ -74,6 +83,7 @@ export function resolveSignalRHubUrl(
 }
 
 export const env = Object.freeze({
+  aiPlannerMode: parseAiPlannerMode(import.meta.env.VITE_AI_PLANNER_MODE),
   apiBaseUrl: parseApiBaseUrl(import.meta.env.VITE_API_BASE_URL),
   mapboxAccessToken: parseMapboxAccessToken(import.meta.env.VITE_MAPBOX_ACCESS_TOKEN),
   signalRHubUrl: resolveSignalRHubUrl(

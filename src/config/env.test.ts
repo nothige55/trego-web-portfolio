@@ -1,11 +1,26 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parseAiPlannerMode,
   parseApiBaseUrl,
   parseMapboxAccessToken,
   parseSignalRHubUrl,
   resolveSignalRHubUrl,
 } from "@/config/env";
+
+describe("parseAiPlannerMode", () => {
+  it("uses the mock transport by default", () => {
+    expect(parseAiPlannerMode(undefined)).toBe("mock");
+    expect(parseAiPlannerMode(" ")).toBe("mock");
+  });
+
+  it("accepts the explicit API transport and rejects typos", () => {
+    expect(parseAiPlannerMode(" API ")).toBe("api");
+    expect(() => parseAiPlannerMode("gateway")).toThrow(
+      "VITE_AI_PLANNER_MODE must be either 'mock' or 'api'.",
+    );
+  });
+});
 
 describe("parseApiBaseUrl", () => {
   it("uses relative requests when the value is missing", () => {

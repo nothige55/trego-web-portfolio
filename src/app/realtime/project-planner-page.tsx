@@ -1,11 +1,17 @@
 import { addDays, format, parseISO } from "date-fns";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ProjectChatTabs } from "@/app/realtime/project-chat-tabs";
 import { useProjectRealtime } from "@/app/realtime/project-realtime-context";
 import {
   ProjectRealtimeProvider,
   ProjectRealtimeStatusBanner,
 } from "@/app/realtime/project-realtime-provider";
+import { env } from "@/config/env";
+import { createAiPlannerApiClient } from "@/features/ai-planner/api/ai-planner-api-client";
+import { mockAiPlannerClient } from "@/features/ai-planner/api/mock-ai-planner-client";
+import { AiPlannerPanel } from "@/features/ai-planner/components/ai-planner-panel";
+import type { AiPlannerContextItem } from "@/features/ai-planner/types/ai-planner";
 import type { AuthSession } from "@/features/auth/types";
 import {
   type ChatMessage,
@@ -544,6 +550,30 @@ function ProjectPlannerPageContent({
   const { client, error: sessionError, isReady } = useProjectRealtime();
   const [isNodeMovePending, setIsNodeMovePending] = useState(false);
   const nodeMovePromiseRef = useRef<Promise<void> | null>(null);
+  const plannerNodes = usePlannerViewStore((state) => state.nodes);
+  const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
+  const multiSelectedIds = usePlannerViewStore((state) => state.multiSelectedIds);
+  const aiPlannerClient = useMemo(
+    () =>
+      env.aiPlannerMode === "api"
+        ? createAiPlannerApiClient({
+            accessToken: identity.accessToken,
+            apiBaseUrl: env.apiBaseUrl,
+            projectId,
+          })
+        : mockAiPlannerClient,
+    [identity.accessToken, projectId],
+  );
+  const aiContextItems = useMemo<readonly AiPlannerContextItem[]>(() => {
+    const selectedPathIds =
+      multiSelectedIds.length > 0
+        ? new Set(multiSelectedIds)
+        : new Set(selectedItemId ? [selectedItemId] : []);
+
+    return plannerNodes
+      .filter((node) => selectedPathIds.has(node.pathId))
+      .map((node) => ({ kind: node.kind, name: node.name, pathId: node.pathId }));
+  }, [multiSelectedIds, plannerNodes, selectedItemId]);
   const sendMessage = useMemo(() => createSendChatMessageCommand(client), [client]);
   const handleSend = useCallback(
     (content: string): Promise<SendChatMessageResult> =>
@@ -631,17 +661,22 @@ function ProjectPlannerPageContent({
         plannerCommands={isReady ? plannerNodeEditingCommands : undefined}
         projectId={projectId}
         chatContent={
-          <RealtimeChatPanel
-            currentUserId={identity.id}
-            currentUserName={identity.name}
-            historyStatus={chatHistoryStatus}
-            isReady={isReady}
-            memberInviteContent={
-              <ProjectMemberInviteForm client={restClient} projectId={projectId} />
+          <ProjectChatTabs
+            aiContent={<AiPlannerPanel client={aiPlannerClient} contextItems={aiContextItems} />}
+            teamContent={
+              <RealtimeChatPanel
+                currentUserId={identity.id}
+                currentUserName={identity.name}
+                historyStatus={chatHistoryStatus}
+                isReady={isReady}
+                memberInviteContent={
+                  <ProjectMemberInviteForm client={restClient} projectId={projectId} />
+                }
+                messages={messages}
+                onRetryHistory={() => void loadChatHistory().catch(() => undefined)}
+                onSend={handleSend}
+              />
             }
-            messages={messages}
-            onRetryHistory={() => void loadChatHistory().catch(() => undefined)}
-            onSend={handleSend}
           />
         }
       />

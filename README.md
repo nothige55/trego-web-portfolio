@@ -25,6 +25,7 @@ npm run dev
 | 이름                       | 필수 여부   | 설명                                                                    |
 | -------------------------- | ----------- | ----------------------------------------------------------------------- |
 | `VITE_API_BASE_URL`        | 선택        | REST API 기준 URL. 비워두면 현재 origin의 상대 경로를 사용              |
+| `VITE_AI_PLANNER_MODE`     | 선택        | `mock`이 기본값. ASP.NET AI 스트리밍 API 연결 후 `api`로 전환           |
 | `VITE_MAPBOX_ACCESS_TOKEN` | 지도에 필수 | Planner 지도를 렌더링하는 Mapbox public access token                    |
 | `VITE_SIGNALR_HUB_URL`     | 선택        | SignalR Hub URL. 비워두면 API origin의 `/project` 또는 로컬 proxy를 사용 |
 
