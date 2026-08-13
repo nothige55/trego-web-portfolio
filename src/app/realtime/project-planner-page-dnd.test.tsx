@@ -55,6 +55,13 @@ vi.mock("@/features/planner/components/planner-workspace", () => ({
       >
         Day 삭제
       </button>
+      <button
+        type="button"
+        disabled={!plannerCommands?.undo}
+        onClick={() => void plannerCommands?.undo?.()}
+      >
+        실행 취소
+      </button>
     </>
   ),
 }));
@@ -310,5 +317,40 @@ describe("ProjectPlannerPage DnD realtime", () => {
     expect(
       usePlannerViewStore.getState().nodes.find((node) => node.pathId === "source-day-path"),
     ).toBeUndefined();
+  });
+
+  it("records a confirmed edit and replays its inverse through the same SignalR adapter", async () => {
+    const signalR = createSignalRClient();
+    const user = userEvent.setup();
+    render(
+      <ProjectPlannerPage
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "member-id",
+          name: "One",
+        }}
+        projectId="project-id"
+        restClient={createRestClient().client}
+      />,
+    );
+
+    const updateButton = await screen.findByRole("button", { name: "Day 수정" });
+    const undoButton = screen.getByRole("button", { name: "실행 취소" });
+    await waitFor(() => expect(updateButton).toBeEnabled());
+    await user.click(updateButton);
+    await user.click(undoButton);
+
+    await waitFor(() =>
+      expect(signalR.invoke).toHaveBeenLastCalledWith("UpdateDay", {
+        id: "source-day-id",
+        name: "Source",
+        color: "#ff0000",
+      }),
+    );
+    expect(
+      usePlannerViewStore.getState().nodes.find((node) => node.pathId === "source-day-path"),
+    ).toMatchObject({ name: "Source", color: "#ff0000" });
   });
 });

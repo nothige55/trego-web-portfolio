@@ -28,10 +28,21 @@ import type {
 } from "@/features/planner/components/planner-schedule-panel";
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
 import {
+  buildDeleteHistoryOperations,
+  executePlannerOperationCommands,
+  type PlannerOperationCommand,
+} from "@/features/planner/operations/planner-operation-command";
+import {
+  buildCreateNodeInput,
+  buildGroupPlan,
+  normalizeOperationPathIds,
+} from "@/features/planner/operations/planner-operations";
+import {
   createPlannerRealtime,
   type PlannerRealtimeCommands,
 } from "@/features/planner/realtime/planner-realtime";
 import type { UpdatePathInput } from "@/features/planner/realtime/project-hub-planner-contracts";
+import { usePlannerHistoryStore } from "@/features/planner/stores/planner-history-store";
 import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import { ProjectMemberInviteForm } from "@/features/project-management/components/project-member-invite-form";
@@ -174,6 +185,7 @@ export function ProjectPlannerPage({
     projectRequestIdRef.current += 1;
     usePlannerViewStore.getState().reset();
     usePlannerMapStore.getState().reset();
+    usePlannerHistoryStore.getState().clear();
     void loadProjectData().catch(() => undefined);
     void loadChatHistory().catch(() => undefined);
 
@@ -185,12 +197,14 @@ export function ProjectPlannerPage({
         historyRequestRef.current = null;
         usePlannerViewStore.getState().reset();
         usePlannerMapStore.getState().reset();
+        usePlannerHistoryStore.getState().clear();
       }
     };
   }, [loadChatHistory, loadProjectData, projectId]);
 
   const resync = useCallback(async () => {
     await Promise.all([loadProjectData(), loadChatHistory()]);
+    usePlannerHistoryStore.getState().clear();
     setFeatureError(null);
   }, [loadChatHistory, loadProjectData]);
 
@@ -261,18 +275,168 @@ export function ProjectPlannerPage({
     },
     [],
   );
-  const updatePlannerPath = useCallback(
-    (input: UpdatePathInput): Promise<void> =>
-      invokePlannerCommand((commands) => commands.updatePath(input)),
+  const runRecordedOperation = useCallback(
+    async (
+      label: string,
+      redo: readonly PlannerOperationCommand[],
+      undo: readonly PlannerOperationCommand[],
+    ): Promise<void> => {
+      try {
+        await invokePlannerCommand((commands) => executePlannerOperationCommands(commands, redo));
+        usePlannerHistoryStore.getState().push({ label, redo, undo });
+      } catch (error) {
+        usePlannerHistoryStore.getState().clear();
+        throw error;
+      }
+    },
     [invokePlannerCommand],
+  );
+  const replayHistory = useCallback(
+    async (direction: "redo" | "undo"): Promise<void> => {
+      const history = usePlannerHistoryStore.getState();
+      const entry = direction === "undo" ? history.takeUndo() : history.takeRedo();
+      if (!entry) return;
+
+      try {
+        await invokePlannerCommand((commands) =>
+          executePlannerOperationCommands(commands, entry[direction]),
+        );
+        usePlannerHistoryStore.getState().finishReplay();
+      } catch (error) {
+        usePlannerHistoryStore.getState().clear();
+        throw error;
+      }
+    },
+    [invokePlannerCommand],
+  );
+  const updatePlannerPath = useCallback(
+    (input: UpdatePathInput, previousInput: UpdatePathInput): Promise<void> =>
+      runRecordedOperation(
+        "일정 이동",
+        [{ type: "update-path", input }],
+        [{ type: "update-path", input: previousInput }],
+      ),
+    [runRecordedOperation],
   );
   const plannerNodeEditingCommands = useMemo<PlannerNodeEditingCommands>(
     () => ({
-      deleteNode: (input) => invokePlannerCommand((commands) => commands.deleteNode(input)),
-      updateDay: (input) => invokePlannerCommand((commands) => commands.updateDay(input)),
-      updateFolder: (input) => invokePlannerCommand((commands) => commands.updateFolder(input)),
+      createNode: async (draft) => {
+        const created = buildCreateNodeInput(usePlannerViewStore.getState().nodes, draft);
+        const createOperation: PlannerOperationCommand = {
+          type: created.kind === "day" ? "create-day" : "create-folder",
+          input: created.input,
+        } as PlannerOperationCommand;
+        await runRecordedOperation(
+          "일정 추가",
+          [createOperation],
+          [{ type: "delete-node", input: { pathId: created.input.pathId } }],
+        );
+      },
+      deleteNode: async (input) => {
+        const nodes = usePlannerViewStore.getState().nodes;
+        const history = buildDeleteHistoryOperations(nodes, [input.pathId]);
+        await runRecordedOperation("일정 삭제", history.redo, history.undo);
+      },
+      deleteNodes: async (pathIds) => {
+        const nodes = usePlannerViewStore.getState().nodes;
+        const normalizedPathIds = normalizeOperationPathIds(nodes, pathIds);
+        const history = buildDeleteHistoryOperations(nodes, normalizedPathIds);
+        await runRecordedOperation("선택 일정 삭제", history.redo, history.undo);
+      },
+      groupNodes: async (pathIds) => {
+        const nodes = usePlannerViewStore.getState().nodes;
+        const plan = buildGroupPlan(nodes, pathIds);
+        const containerOperation: PlannerOperationCommand = {
+          type: plan.container.kind === "activity" ? "create-activity" : "create-folder",
+          input: plan.container.input,
+        } as PlannerOperationCommand;
+        const originals = plan.moves.map((move) => {
+          const node = nodes.find((candidate) => candidate.pathId === move.pathId)!;
+          return {
+            type: "update-path" as const,
+            input: {
+              pathId: node.pathId,
+              parentPathId: node.parentPathId,
+              position: node.position,
+            },
+          };
+        });
+        await runRecordedOperation(
+          "선택 일정 그룹화",
+          [
+            containerOperation,
+            ...plan.moves.map((input) => ({ type: "update-path" as const, input })),
+          ],
+          [...originals, { type: "delete-node", input: { pathId: plan.container.input.pathId } }],
+        );
+      },
+      redo: () => replayHistory("redo"),
+      undo: () => replayHistory("undo"),
+      updateActivity: async (input) => {
+        const node = usePlannerViewStore
+          .getState()
+          .nodes.find((candidate) => candidate.kind === "activity" && candidate.id === input.id);
+        if (!node || node.kind !== "activity") throw new Error("Activity를 찾을 수 없습니다.");
+        await runRecordedOperation(
+          "Activity 메모 수정",
+          [{ type: "update-activity", input }],
+          [
+            {
+              type: "update-activity",
+              input: {
+                id: node.id,
+                name: node.name,
+                memo: node.memo,
+                startTime: node.startTime,
+                endTime: node.endTime,
+                markerType: node.markerType,
+                travelMode: node.travelMode,
+                travelTime: node.travelTime,
+                travelDistance: node.travelDistance,
+                travelCost: node.travelCost,
+              },
+            },
+          ],
+        );
+      },
+      updateDay: async (input) => {
+        const node = usePlannerViewStore
+          .getState()
+          .nodes.find((candidate) => candidate.kind === "day" && candidate.id === input.id);
+        if (!node || node.kind !== "day") throw new Error("Day를 찾을 수 없습니다.");
+        await runRecordedOperation(
+          "Day 수정",
+          [{ type: "update-day", input }],
+          [
+            {
+              type: "update-day",
+              input: { id: node.id, name: node.name, color: node.color ?? "#F44336" },
+            },
+          ],
+        );
+      },
+      updateFolder: async (input) => {
+        const node = usePlannerViewStore
+          .getState()
+          .nodes.find((candidate) => candidate.kind === "folder" && candidate.id === input.id);
+        if (!node || node.kind !== "folder") throw new Error("폴더를 찾을 수 없습니다.");
+        await runRecordedOperation(
+          "폴더 수정",
+          [{ type: "update-folder", input }],
+          [
+            {
+              type: "update-folder",
+              input: {
+                id: node.id,
+                name: node.name,
+                folderType: node.folderType ?? "default",
+              },
+            },
+          ],
+        );
+      },
     }),
-    [invokePlannerCommand],
+    [replayHistory, runRecordedOperation],
   );
 
   return (
@@ -316,7 +480,10 @@ type ProjectPlannerPageContentProps = {
   readonly projectDataState: ProjectDataState;
   readonly projectId: string;
   readonly restClient: ApiClient;
-  readonly updatePlannerPath: (input: UpdatePathInput) => Promise<void>;
+  readonly updatePlannerPath: (
+    input: UpdatePathInput,
+    previousInput: UpdatePathInput,
+  ) => Promise<void>;
 };
 
 function ProjectPlannerPageContent({
@@ -347,12 +514,22 @@ function ProjectPlannerPageContent({
         return;
       }
 
-      usePlannerViewStore.getState().moveNode(pathId, destination);
-      const movePromise = updatePlannerPath({
+      const currentNode = usePlannerViewStore.getState().tree.entityMap.get(pathId);
+      if (!currentNode) return;
+      const previousInput = {
         pathId,
-        parentPathId: destination.parentPathId,
-        position: destination.position,
-      });
+        parentPathId: currentNode.parentPathId,
+        position: currentNode.position,
+      };
+      usePlannerViewStore.getState().moveNode(pathId, destination);
+      const movePromise = updatePlannerPath(
+        {
+          pathId,
+          parentPathId: destination.parentPathId,
+          position: destination.position,
+        },
+        previousInput,
+      );
       nodeMovePromiseRef.current = movePromise;
       setIsNodeMovePending(true);
 

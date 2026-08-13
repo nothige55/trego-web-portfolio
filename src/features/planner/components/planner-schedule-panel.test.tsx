@@ -38,6 +38,7 @@ vi.mock("@/features/planner/dnd/use-planner-drag-and-drop", () => ({
 
 function createPlannerCommands(): PlannerNodeEditingCommands {
   return {
+    updateActivity: vi.fn().mockResolvedValue(undefined),
     updateFolder: vi.fn().mockResolvedValue(undefined),
     updateDay: vi.fn().mockResolvedValue(undefined),
     deleteNode: vi.fn().mockResolvedValue(undefined),
@@ -204,5 +205,101 @@ describe("PlannerSchedulePanel", () => {
 
     expect(commands.deleteNode).toHaveBeenCalledTimes(1);
     expect(commands.deleteNode).toHaveBeenCalledWith({ pathId: "day-one-airport" });
+  });
+
+  it("keeps Activity names read-only and edits only their memo", async () => {
+    const commands = createPlannerCommands();
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(
+      <PlannerWorkspace
+        isNodeMoveEnabled
+        onMoveNode={vi.fn()}
+        plannerCommands={commands}
+        projectId="demo"
+      />,
+    );
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+    await user.click(within(tree).getByRole("button", { name: "가보고 싶은 곳 펼치기" }));
+
+    await user.dblClick(within(tree).getByRole("button", { name: "우도" }));
+    expect(within(tree).queryByRole("textbox", { name: "우도 이름" })).not.toBeInTheDocument();
+
+    fireEvent.contextMenu(within(tree).getByRole("button", { name: "우도" }));
+    await user.click(await screen.findByRole("menuitem", { name: "메모 편집" }));
+    const memoInput = screen.getByRole("textbox", { name: "Activity 메모" });
+    expect(memoInput).toHaveValue("날씨가 좋으면 배편 확인");
+    await user.clear(memoInput);
+    await user.type(memoInput, "배편 먼저 예약");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    expect(commands.updateActivity).toHaveBeenLastCalledWith({
+      id: "demo-wish-udo",
+      name: "우도",
+      memo: "배편 먼저 예약",
+    });
+  });
+
+  it("creates a date at the trip root without exposing a parent selector", async () => {
+    const commands = {
+      ...createPlannerCommands(),
+      createNode: vi.fn().mockResolvedValue(undefined),
+    };
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(
+      <PlannerWorkspace
+        isNodeMoveEnabled
+        onMoveNode={vi.fn()}
+        plannerCommands={commands}
+        projectId="demo"
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "일정 추가" }));
+    expect(screen.getByRole("combobox", { name: "일정 종류" })).toHaveDisplayValue("날짜");
+    expect(screen.queryByRole("option", { name: "Activity" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "상위 일정" })).not.toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: "새 일정 이름" }), "8월 19일");
+    await user.click(screen.getByRole("button", { name: "추가" }));
+
+    expect(commands.createNode).toHaveBeenCalledWith({
+      kind: "day",
+      name: "8월 19일",
+      parentPathId: "root",
+    });
+  });
+
+  it("runs grouped selection commands from the keyboard", async () => {
+    const commands = {
+      ...createPlannerCommands(),
+      deleteNodes: vi.fn().mockResolvedValue(undefined),
+      groupNodes: vi.fn().mockResolvedValue(undefined),
+    };
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(
+      <PlannerWorkspace
+        isNodeMoveEnabled
+        onMoveNode={vi.fn()}
+        plannerCommands={commands}
+        projectId="demo"
+      />,
+    );
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+    await user.click(within(tree).getByRole("button", { name: "가보고 싶은 곳 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "우도" }));
+    await user.keyboard("{Shift>}");
+    await user.click(within(tree).getByRole("button", { name: "아르떼뮤지엄 제주" }));
+    await user.keyboard("{/Shift}");
+    tree.focus();
+    await user.keyboard("{Meta>}g{/Meta}");
+
+    expect(commands.groupNodes).toHaveBeenCalledWith(["wish-udo", "wish-arte-museum"]);
+    await user.keyboard("{Delete}");
+    expect(commands.deleteNodes).toHaveBeenCalledWith(["wish-udo", "wish-arte-museum"]);
   });
 });

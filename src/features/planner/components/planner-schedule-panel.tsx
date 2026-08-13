@@ -11,9 +11,12 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Group,
   ListChevronsDownUp,
   Pencil,
+  Redo2,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -25,17 +28,28 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DayMapVisibilityToggle } from "@/features/planner/components/day-map-visibility-toggle";
 import {
   PLANNER_BREADCRUMB_HEIGHT,
   PlannerBreadcrumb,
 } from "@/features/planner/components/planner-breadcrumb";
+import { PlannerNodeCreateDialog } from "@/features/planner/components/planner-node-create-dialog";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
 import { PLANNER_DAY_COLORS } from "@/features/planner/data/planner-day-colors";
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import { calculatePlannerDragFootprintHeight } from "@/features/planner/dnd/resolve-planner-drop";
 import { usePlannerDragAndDrop } from "@/features/planner/dnd/use-planner-drag-and-drop";
+import type { PlannerCreateNodeDraft } from "@/features/planner/operations/planner-operations";
 import type { PlannerRealtimeCommands } from "@/features/planner/realtime/planner-realtime";
+import { usePlannerHistoryStore } from "@/features/planner/stores/planner-history-store";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type {
   FlattenedPlannerNode,
@@ -149,6 +163,9 @@ function PlannerTreeItem({
   const indentation = Math.max(0, node.depth - 1) * 30;
   const isEditing = editingPathId === node.pathId;
   const canRename = node.kind === "folder" || node.kind === "day";
+  const operationPathIds = multiSelectedIds.includes(node.pathId)
+    ? multiSelectedIds
+    : [node.pathId];
 
   useEffect(() => {
     if (!isEditing) {
@@ -329,6 +346,20 @@ function PlannerTreeItem({
                 이름 변경
               </ContextMenuItem>
             ) : null}
+            {node.kind === "activity" ? (
+              <ContextMenuItem onClick={() => commands.editActivityMemo?.(node.pathId)}>
+                <Pencil aria-hidden="true" />
+                메모 편집
+              </ContextMenuItem>
+            ) : null}
+            {operationPathIds.length >= 2 && commands.groupNodes ? (
+              <ContextMenuItem
+                onClick={() => void commands.groupNodes?.(operationPathIds).catch(() => undefined)}
+              >
+                <Group aria-hidden="true" />
+                선택 일정 그룹화
+              </ContextMenuItem>
+            ) : null}
             {node.kind === "day" ? (
               <div aria-label="Day 색상 선택" className="flex items-center gap-1 p-1" role="group">
                 <ContextMenuItem
@@ -374,11 +405,14 @@ function PlannerTreeItem({
             <ContextMenuItem
               variant="destructive"
               onClick={() => {
-                void commands.deleteNode({ pathId: node.pathId }).catch(() => undefined);
+                const operation = commands.deleteNodes
+                  ? commands.deleteNodes(operationPathIds)
+                  : commands.deleteNode({ pathId: node.pathId });
+                void operation.catch(() => undefined);
               }}
             >
               <Trash2 aria-hidden="true" />
-              삭제
+              {operationPathIds.length > 1 ? `${operationPathIds.length}개 삭제` : "삭제"}
             </ContextMenuItem>
           </ContextMenuContent>
         ) : null}
@@ -394,8 +428,15 @@ export type PlannerNodeMoveHandler = (
 
 export type PlannerNodeEditingCommands = Pick<
   PlannerRealtimeCommands,
-  "deleteNode" | "updateDay" | "updateFolder"
->;
+  "deleteNode" | "updateActivity" | "updateDay" | "updateFolder"
+> & {
+  readonly createNode?: (draft: PlannerCreateNodeDraft) => Promise<void>;
+  readonly deleteNodes?: (pathIds: readonly PlannerNodePathId[]) => Promise<void>;
+  readonly editActivityMemo?: (pathId: PlannerNodePathId) => void;
+  readonly groupNodes?: (pathIds: readonly PlannerNodePathId[]) => Promise<void>;
+  readonly redo?: () => Promise<void>;
+  readonly undo?: () => Promise<void>;
+};
 
 type PlannerSchedulePanelProps = {
   readonly commands?: PlannerNodeEditingCommands;
@@ -411,6 +452,8 @@ export function PlannerSchedulePanel({
   const projectDetails = usePlannerViewStore((state) => state.projectDetails);
   const tree = usePlannerViewStore((state) => state.tree);
   const rootPathId = usePlannerViewStore((state) => state.rootPathId);
+  const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
+  const multiSelectedIds = usePlannerViewStore((state) => state.multiSelectedIds);
   const expandedIds = usePlannerViewStore((state) => state.expandedIds);
   const collapseAll = usePlannerViewStore((state) => state.collapseAll);
   const clearSelection = usePlannerViewStore((state) => state.clearSelection);
@@ -421,6 +464,12 @@ export function PlannerSchedulePanel({
   const [dragFootprintHeight, setDragFootprintHeight] = useState(0);
   const [editingPathId, setEditingPathId] = useState<PlannerNodePathId | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [memoEditingPathId, setMemoEditingPathId] = useState<PlannerNodePathId | null>(null);
+  const [memoDraft, setMemoDraft] = useState("");
+  const historyPastCount = usePlannerHistoryStore((state) => state.past.length);
+  const historyFutureCount = usePlannerHistoryStore((state) => state.future.length);
+  const isHistoryReplaying = usePlannerHistoryStore((state) => state.isReplaying);
+  const memoEditingNode = memoEditingPathId ? tree.entityMap.get(memoEditingPathId) : undefined;
   const beginEditing = (node: FlattenedPlannerNode): void => {
     setEditingPathId(node.pathId);
     setEditingName(node.name);
@@ -435,12 +484,14 @@ export function PlannerSchedulePanel({
       return;
     }
 
-    const nextName = editingName;
+    const nextName = editingName.trim();
     cancelEditing();
 
-    if (nextName === node.name) {
+    if (!nextName || nextName === node.name) {
       return;
     }
+
+    if (node.kind === "activity") return;
 
     const operation =
       node.kind === "folder"
@@ -449,11 +500,16 @@ export function PlannerSchedulePanel({
             name: nextName,
             folderType: node.folderType ?? "default",
           })
-        : node.kind === "day"
-          ? commands.updateDay({ id: node.id, name: nextName, color: node.color ?? "#F44336" })
-          : Promise.resolve();
+        : commands.updateDay({ id: node.id, name: nextName, color: node.color ?? "#F44336" });
     void operation.catch(() => undefined);
   };
+  const openMemoEditor = (pathId: PlannerNodePathId): void => {
+    const node = tree.entityMap.get(pathId);
+    if (node?.kind !== "activity") return;
+    setMemoEditingPathId(pathId);
+    setMemoDraft(node.memo ?? "");
+  };
+  const commandBindings = commands ? { ...commands, editActivityMemo: openMemoEditor } : undefined;
   const visibleItems = useMemo(
     () => getVisiblePlannerNodes(tree.flattenedItems, expandedIds, tree.childrenMap),
     [expandedIds, tree.childrenMap, tree.flattenedItems],
@@ -608,9 +664,7 @@ export function PlannerSchedulePanel({
         <div className="mt-2 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold">{projectDetails.title}</h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              여행 메모와 태그 기능을 준비 중입니다.
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">실시간으로 일정을 함께 편집합니다.</p>
           </div>
           <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">
             {formatDateRange(projectDetails.startDate, projectDetails.endDate)}
@@ -621,18 +675,47 @@ export function PlannerSchedulePanel({
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-x-0 top-0 z-50 flex h-8 items-center justify-between bg-card px-6 pr-2 text-sm font-medium">
           <span>일정</span>
-          {hasExpandedTopLevelBranch ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-6"
-              aria-label="모든 일정 접기"
-              onClick={collapseAll}
-            >
-              <ListChevronsDownUp aria-hidden="true" className="size-3.5" />
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-0.5">
+            {commands?.undo ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="실행 취소"
+                disabled={historyPastCount === 0 || isHistoryReplaying}
+                onClick={() => void commands.undo?.().catch(() => undefined)}
+              >
+                <Undo2 aria-hidden="true" />
+              </Button>
+            ) : null}
+            {commands?.redo ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="다시 실행"
+                disabled={historyFutureCount === 0 || isHistoryReplaying}
+                onClick={() => void commands.redo?.().catch(() => undefined)}
+              >
+                <Redo2 aria-hidden="true" />
+              </Button>
+            ) : null}
+            {commands?.createNode && rootPathId ? (
+              <PlannerNodeCreateDialog rootPathId={rootPathId} onCreate={commands.createNode} />
+            ) : null}
+            {hasExpandedTopLevelBranch ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-6"
+                aria-label="모든 일정 접기"
+                onClick={collapseAll}
+              >
+                <ListChevronsDownUp aria-hidden="true" className="size-3.5" />
+              </Button>
+            ) : null}
+          </div>
         </div>
         <div
           ref={scrollContainerRef}
@@ -666,6 +749,39 @@ export function PlannerSchedulePanel({
                   }
                 }}
                 onKeyDown={(event) => {
+                  const target = event.target as HTMLElement;
+                  const isTextInput =
+                    target instanceof HTMLInputElement ||
+                    target instanceof HTMLTextAreaElement ||
+                    target.isContentEditable;
+                  if (isTextInput || event.nativeEvent.isComposing) return;
+
+                  const operationPathIds =
+                    multiSelectedIds.length > 0
+                      ? multiSelectedIds
+                      : selectedItemId
+                        ? [selectedItemId]
+                        : [];
+                  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+                    event.preventDefault();
+                    const operation = event.shiftKey ? commands?.redo?.() : commands?.undo?.();
+                    void operation?.catch(() => undefined);
+                  } else if (
+                    (event.metaKey || event.ctrlKey) &&
+                    event.key.toLowerCase() === "g" &&
+                    operationPathIds.length >= 2
+                  ) {
+                    event.preventDefault();
+                    void commands?.groupNodes?.(operationPathIds).catch(() => undefined);
+                  } else if (event.key === "Delete" && operationPathIds.length > 0) {
+                    event.preventDefault();
+                    const operation = commands?.deleteNodes
+                      ? commands.deleteNodes(operationPathIds)
+                      : operationPathIds.length === 1
+                        ? commands?.deleteNode({ pathId: operationPathIds[0]! })
+                        : undefined;
+                    void operation?.catch(() => undefined);
+                  }
                   if (event.key === "Escape") {
                     clearSelection();
                   }
@@ -698,7 +814,7 @@ export function PlannerSchedulePanel({
                       isSiblingDropActive={isSiblingDropActive}
                       isSortable={isNodeMoveEnabled}
                       suppressSelectionHighlight={activePathId !== null}
-                      commands={commands}
+                      commands={commandBindings}
                       editingPathId={editingPathId}
                       editingName={editingName}
                       onBeginEditing={beginEditing}
@@ -747,6 +863,44 @@ export function PlannerSchedulePanel({
           />
         </div>
       </div>
+      <Dialog
+        open={Boolean(memoEditingNode)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setMemoEditingPathId(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Activity 메모</DialogTitle>
+            <DialogDescription>{memoEditingNode?.name}</DialogDescription>
+          </DialogHeader>
+          <textarea
+            autoFocus
+            aria-label="Activity 메모"
+            className="min-h-32 resize-y rounded-lg border bg-background px-3 py-2 text-sm"
+            value={memoDraft}
+            onChange={(event) => setMemoDraft(event.target.value)}
+          />
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!commands || memoEditingNode?.kind !== "activity") return;
+                setMemoEditingPathId(null);
+                void commands
+                  .updateActivity({
+                    id: memoEditingNode.id,
+                    name: memoEditingNode.name,
+                    memo: memoDraft.trim() || null,
+                  })
+                  .catch(() => undefined);
+              }}
+            >
+              저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }
