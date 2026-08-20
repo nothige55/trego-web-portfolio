@@ -13,8 +13,13 @@ import type {
   PlannerMapModel,
   PlannerMapRoute,
 } from "@/features/planner/map/planner-map-model";
+import {
+  type PlannerRouteHoverProgress,
+  stepPlannerRouteHoverProgress,
+} from "@/features/planner/map/planner-route-hover-progress";
 import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
+import type { PlannerNodePathId } from "@/features/planner/types/planner-node";
 
 const MAP_STYLE = "mapbox://styles/mapbox/standard";
 const DEFAULT_CENTER: [longitude: number, latitude: number] = [126.5312, 33.4996];
@@ -33,7 +38,7 @@ type MapLoadState = "loading" | "ready" | "error";
 
 type RenderedMarker = {
   readonly marker: mapboxgl.Marker;
-  readonly element: HTMLDivElement;
+  readonly element: HTMLButtonElement;
   readonly label: HTMLSpanElement;
   readonly pin: HTMLSpanElement;
 };
@@ -46,6 +51,8 @@ type PlannerRoutesGeoJson = {
       readonly dayPathId: string;
       readonly color: string;
       readonly opacity: number;
+      readonly isHovered: boolean;
+      readonly hoverProgress: number;
     };
     readonly geometry: {
       readonly type: "LineString";
@@ -54,7 +61,10 @@ type PlannerRoutesGeoJson = {
   }>;
 };
 
-function toRoutesGeoJson(routes: readonly PlannerMapRoute[]): PlannerRoutesGeoJson {
+function toRoutesGeoJson(
+  routes: readonly PlannerMapRoute[],
+  hoverProgress: PlannerRouteHoverProgress,
+): PlannerRoutesGeoJson {
   return {
     type: "FeatureCollection",
     features: routes.map((route) => ({
@@ -63,6 +73,8 @@ function toRoutesGeoJson(routes: readonly PlannerMapRoute[]): PlannerRoutesGeoJs
         dayPathId: route.dayPathId,
         color: route.color,
         opacity: route.opacity,
+        isHovered: route.isHovered,
+        hoverProgress: hoverProgress.get(route.dayPathId) ?? (route.isHovered ? 1 : 0),
       },
       geometry: {
         type: "LineString",
@@ -73,9 +85,10 @@ function toRoutesGeoJson(routes: readonly PlannerMapRoute[]): PlannerRoutesGeoJs
 }
 
 function createMarkerElement(): Omit<RenderedMarker, "marker"> {
-  const element = document.createElement("div");
-  element.className = "pointer-events-none transition-opacity";
-  element.setAttribute("aria-hidden", "true");
+  const element = document.createElement("button");
+  element.type = "button";
+  element.className =
+    "pointer-events-auto cursor-pointer border-0 bg-transparent p-0 transition-opacity";
 
   const content = document.createElement("div");
   content.className = "flex flex-col items-center gap-1";
@@ -94,29 +107,41 @@ function createMarkerElement(): Omit<RenderedMarker, "marker"> {
 }
 
 function updateMarker(renderedMarker: RenderedMarker, markerModel: PlannerMapMarker): void {
+  const isEmphasized = markerModel.isSelected || markerModel.isHovered;
   renderedMarker.marker.setLngLat([...markerModel.coordinate]);
   renderedMarker.element.style.opacity = String(markerModel.opacity);
-  renderedMarker.element.style.zIndex = markerModel.isSelected ? "10" : "0";
+  renderedMarker.element.style.zIndex = isEmphasized ? "10" : "0";
+  renderedMarker.element.setAttribute("aria-label", `${markerModel.name} 일정 선택`);
   renderedMarker.label.textContent = markerModel.name;
   renderedMarker.label.style.color = markerModel.color;
   renderedMarker.pin.textContent = String(markerModel.number);
   renderedMarker.pin.style.backgroundColor = markerModel.color;
-  renderedMarker.pin.style.transform = markerModel.isSelected ? "scale(1.2)" : "scale(1)";
+  renderedMarker.pin.style.transform = isEmphasized ? "scale(1.35)" : "scale(1)";
 }
+
+// 마커 엘리먼트는 canvas container의 자식이라 마커 위 포인터 이동도 지도까지 전달된다.
+// 마커 아래에 경로선이 깔려 있으면 지도가 그 선을 hover로 잡아 마커 hover를 덮어쓰므로,
+// 마커를 가리키는 동안에는 경로선 hover를 건너뛰도록 현재 hover 중인 마커를 함께 추적한다.
+type HoveredMarkerRef = { current: PlannerNodePathId | null };
 
 function syncMarkers({
   map,
   markers,
   renderedMarkers,
+  hoveredMarkerRef,
 }: {
   readonly map: MapboxMap;
   readonly markers: readonly PlannerMapMarker[];
   readonly renderedMarkers: Map<string, RenderedMarker>;
+  readonly hoveredMarkerRef: HoveredMarkerRef;
 }): void {
   const activePathIds = new Set(markers.map((marker) => marker.pathId));
 
   renderedMarkers.forEach((renderedMarker, pathId) => {
     if (!activePathIds.has(pathId)) {
+      if (hoveredMarkerRef.current === pathId) {
+        hoveredMarkerRef.current = null;
+      }
       renderedMarker.marker.remove();
       renderedMarkers.delete(pathId);
     }
@@ -127,6 +152,25 @@ function syncMarkers({
 
     if (!renderedMarker) {
       const markerElement = createMarkerElement();
+      markerElement.element.addEventListener("click", (event) => {
+        // 마커 아래에 경로선이 깔려 있으면 지도 click까지 이어져 Day가 대신 선택된다.
+        event.stopPropagation();
+        usePlannerViewStore.getState().activateItem(markerModel.pathId);
+      });
+      markerElement.element.addEventListener("pointerenter", () => {
+        hoveredMarkerRef.current = markerModel.pathId;
+        usePlannerViewStore.getState().setHoveredItem(markerModel.pathId);
+      });
+      markerElement.element.addEventListener("pointerleave", () => {
+        if (hoveredMarkerRef.current === markerModel.pathId) {
+          hoveredMarkerRef.current = null;
+        }
+        const state = usePlannerViewStore.getState();
+        if (state.hoveredItemId === markerModel.pathId) {
+          state.setHoveredItem(null);
+        }
+      });
+      markerElement.element.addEventListener("pointerdown", (event) => event.stopPropagation());
       const marker = new mapboxgl.Marker({
         element: markerElement.element,
         anchor: "bottom",
@@ -142,15 +186,33 @@ function syncMarkers({
   });
 }
 
-function syncRoutes(map: MapboxMap, routes: readonly PlannerMapRoute[]): void {
+function syncRoutes(
+  map: MapboxMap,
+  routes: readonly PlannerMapRoute[],
+  hoverProgress: PlannerRouteHoverProgress,
+): void {
   const source = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
-  source?.setData(toRoutesGeoJson(routes));
+  source?.setData(toRoutesGeoJson(routes, hoverProgress));
 }
 
-function addRouteLayers(map: MapboxMap): void {
+function getRouteDayPathId(event: { readonly features?: readonly unknown[] }): string | null {
+  const feature = event.features?.[0];
+  if (!feature || typeof feature !== "object" || !("properties" in feature)) {
+    return null;
+  }
+
+  const properties = feature.properties;
+  if (!properties || typeof properties !== "object" || !("dayPathId" in properties)) {
+    return null;
+  }
+
+  return typeof properties.dayPathId === "string" ? properties.dayPathId : null;
+}
+
+function addRouteLayers(map: MapboxMap, hoveredMarkerRef: HoveredMarkerRef): void {
   map.addSource(ROUTE_SOURCE_ID, {
     type: "geojson",
-    data: toRoutesGeoJson([]),
+    data: toRoutesGeoJson([], new Map()),
   });
   map.addLayer({
     id: ROUTE_BORDER_LAYER_ID,
@@ -159,7 +221,15 @@ function addRouteLayers(map: MapboxMap): void {
     layout: { "line-cap": "round", "line-join": "round" },
     paint: {
       "line-color": "#FFFFFF",
-      "line-width": 8,
+      "line-width": [
+        "interpolate",
+        ["linear"],
+        ["to-number", ["get", "hoverProgress"], 0],
+        0,
+        8,
+        1,
+        10,
+      ],
       "line-opacity": ["get", "opacity"],
     },
   });
@@ -170,9 +240,47 @@ function addRouteLayers(map: MapboxMap): void {
     layout: { "line-cap": "round", "line-join": "round" },
     paint: {
       "line-color": ["get", "color"],
-      "line-width": 4,
+      "line-width": [
+        "interpolate",
+        ["linear"],
+        ["to-number", ["get", "hoverProgress"], 0],
+        0,
+        4,
+        1,
+        6,
+      ],
       "line-opacity": ["get", "opacity"],
     },
+  });
+  // mouseenter가 아니라 mousemove를 듣는다. 마커에서 다시 선 위로 빠져나올 때
+  // 지도는 여전히 선 안에 있다고 보아 mouseenter를 다시 쏘지 않기 때문이다.
+  map.on("mousemove", ROUTE_LAYER_ID, (event) => {
+    map.getCanvas().style.cursor = "pointer";
+    if (hoveredMarkerRef.current) {
+      return;
+    }
+
+    const dayPathId = getRouteDayPathId(event);
+    const state = usePlannerViewStore.getState();
+    if (dayPathId && state.hoveredItemId !== dayPathId) {
+      state.setHoveredItem(dayPathId);
+    }
+  });
+  map.on("mouseleave", ROUTE_LAYER_ID, () => {
+    map.getCanvas().style.cursor = "";
+    const state = usePlannerViewStore.getState();
+    const hoveredNode = state.hoveredItemId
+      ? state.tree.entityMap.get(state.hoveredItemId)
+      : undefined;
+    if (hoveredNode?.kind === "day") {
+      state.setHoveredItem(null);
+    }
+  });
+  map.on("click", ROUTE_LAYER_ID, (event) => {
+    const dayPathId = getRouteDayPathId(event);
+    if (dayPathId) {
+      usePlannerViewStore.getState().activateItem(dayPathId);
+    }
   });
 }
 
@@ -253,6 +361,7 @@ function focusMap(map: MapboxMap, focus: PlannerMapFocus): void {
 export function PlannerMap({ accessToken }: { readonly accessToken?: string | null }) {
   const tree = usePlannerViewStore((state) => state.tree);
   const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
+  const hoveredItemId = usePlannerViewStore((state) => state.hoveredItemId);
   const mapFocusRequest = usePlannerViewStore((state) => state.mapFocusRequest);
   const isModuleCollapsed = usePlannerViewStore((state) => state.isModuleCollapsed);
   const setModuleCollapsed = usePlannerViewStore((state) => state.setModuleCollapsed);
@@ -266,9 +375,11 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
   const hasAppliedInitialCameraRef = useRef(false);
   const lastHandledFocusRequestRef = useRef(mapFocusRequest);
   const renderedMarkersRef = useRef(new Map<string, RenderedMarker>());
+  const hoveredMarkerRef = useRef<PlannerNodePathId | null>(null);
+  const routeHoverProgressRef = useRef<PlannerRouteHoverProgress>(new Map());
   const mapModel = useMemo(
-    () => buildPlannerMapModel({ tree, hiddenDayIds, selectedItemId }),
-    [hiddenDayIds, selectedItemId, tree],
+    () => buildPlannerMapModel({ tree, hiddenDayIds, selectedItemId, hoveredItemId }),
+    [hiddenDayIds, hoveredItemId, selectedItemId, tree],
   );
   const mapModelRef = useRef(mapModel);
   const mapFocusRequestRef = useRef(mapFocusRequest);
@@ -329,12 +440,13 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
       clearLoadTimeout();
       isLoadedRef.current = true;
       setMapLoadState("ready");
-      addRouteLayers(map);
-      syncRoutes(map, mapModelRef.current.routes);
+      addRouteLayers(map, hoveredMarkerRef);
+      syncRoutes(map, mapModelRef.current.routes, routeHoverProgressRef.current);
       syncMarkers({
         map,
         markers: mapModelRef.current.markers,
         renderedMarkers,
+        hoveredMarkerRef,
       });
       hasAppliedInitialCameraRef.current = applyInitialCamera(map, mapModelRef.current);
       const focusRequest = mapFocusRequestRef.current;
@@ -388,8 +500,12 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
       return;
     }
 
-    syncRoutes(map, mapModel.routes);
-    syncMarkers({ map, markers: mapModel.markers, renderedMarkers: renderedMarkersRef.current });
+    syncMarkers({
+      map,
+      markers: mapModel.markers,
+      renderedMarkers: renderedMarkersRef.current,
+      hoveredMarkerRef,
+    });
 
     if (!hasAppliedInitialCameraRef.current) {
       hasAppliedInitialCameraRef.current = applyInitialCamera(map, mapModel);
@@ -404,6 +520,44 @@ export function PlannerMap({ accessToken }: { readonly accessToken?: string | nu
     }
     lastHandledFocusRequestRef.current = mapFocusRequest;
   }, [mapFocusRequest, mapModel]);
+
+  // hover 굵기를 프레임마다 보간해 넣는다. 첫 반영은 동기로 처리해 색·표시 여부는 즉시 맞춘다.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoadedRef.current) {
+      return;
+    }
+
+    const applyStep = (elapsedMs: number): boolean => {
+      const { progress, isSettled } = stepPlannerRouteHoverProgress(
+        routeHoverProgressRef.current,
+        mapModel.routes,
+        elapsedMs,
+      );
+      routeHoverProgressRef.current = progress;
+      syncRoutes(map, mapModel.routes, progress);
+      return isSettled;
+    };
+
+    if (applyStep(0)) {
+      return;
+    }
+
+    let frame = 0;
+    let previousTime: number | null = null;
+    const step = (time: number) => {
+      const elapsedMs = previousTime === null ? 0 : time - previousTime;
+      previousTime = time;
+      if (!applyStep(elapsedMs)) {
+        frame = requestAnimationFrame(step);
+      }
+    };
+    frame = requestAnimationFrame(step);
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [mapLoadState, mapModel.routes]);
 
   return (
     <section

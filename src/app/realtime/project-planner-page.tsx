@@ -22,6 +22,7 @@ import {
   createCursorPresenceController,
   type CursorPresenceController,
 } from "@/features/collaboration/realtime/cursor-presence-controller";
+import { MockPlaceExplorer } from "@/features/places/components/mock-place-explorer";
 import { getProjectDetails, getProjectNodes } from "@/features/planner/api/project-api";
 import type {
   PlannerNodeEditingCommands,
@@ -626,6 +627,7 @@ function ProjectPlannerPageContent({
         </div>
       ) : null}
       <PlannerWorkspace
+        exploreContent={<MockPlaceExplorer />}
         isNodeMoveEnabled={isReady && !isNodeMovePending}
         onMoveNode={handleMoveNode}
         plannerCommands={isReady ? plannerNodeEditingCommands : undefined}

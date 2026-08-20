@@ -104,6 +104,22 @@ describe("usePlannerViewStore", () => {
     expect(usePlannerViewStore.getState().mapFocusRequest).toBeNull();
   });
 
+  it("keeps transient hover separate and reveals ancestors when a map marker activates an item", () => {
+    const store = usePlannerViewStore.getState();
+    store.load(demoPlannerProject.nodes);
+    store.setHoveredItem("day-one-airport");
+
+    expect(usePlannerViewStore.getState().hoveredItemId).toBe("day-one-airport");
+    expect(usePlannerViewStore.getState().selectedItemId).toBeNull();
+
+    store.activateItem("day-one-airport");
+    const state = usePlannerViewStore.getState();
+    expect(state.hoveredItemId).toBeNull();
+    expect([...state.expandedIds]).toEqual(
+      expect.arrayContaining(["root", "region-jeju", "day-one"]),
+    );
+  });
+
   it("normalizes only the nodes visible between the shift-selection endpoints", () => {
     const store = usePlannerViewStore.getState();
     store.load(demoPlannerProject.nodes);

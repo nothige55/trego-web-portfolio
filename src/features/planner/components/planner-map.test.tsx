@@ -6,7 +6,9 @@ import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store"
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import { act, render, screen, userEvent } from "@/testing/test-utils";
 
-type EventHandler = () => void;
+type EventHandler = (event?: {
+  readonly features?: Array<{ readonly properties?: Record<string, unknown> }>;
+}) => void;
 
 interface MockSource {
   readonly setData: ReturnType<typeof vi.fn>;
@@ -19,17 +21,18 @@ interface MockMapInstance {
   readonly easeTo: ReturnType<typeof vi.fn>;
   readonly fitBounds: ReturnType<typeof vi.fn>;
   readonly getZoom: ReturnType<typeof vi.fn>;
+  readonly getCanvas: () => HTMLCanvasElement;
   readonly getSource: (id: string) => MockSource | undefined;
   readonly remove: ReturnType<typeof vi.fn>;
   readonly resize: ReturnType<typeof vi.fn>;
   readonly setCenter: ReturnType<typeof vi.fn>;
   readonly setZoom: ReturnType<typeof vi.fn>;
-  trigger: (event: string) => void;
+  trigger: (event: string, layerId?: string, payload?: Parameters<EventHandler>[0]) => void;
 }
 
 interface MockMarkerInstance {
   readonly addTo: ReturnType<typeof vi.fn>;
-  readonly element: HTMLDivElement;
+  readonly element: HTMLButtonElement;
   readonly remove: ReturnType<typeof vi.fn>;
   readonly setLngLat: ReturnType<typeof vi.fn>;
 }
@@ -55,6 +58,8 @@ vi.mock("mapbox-gl", () => {
     readonly resize = vi.fn();
     readonly setCenter = vi.fn();
     readonly setZoom = vi.fn();
+    readonly canvas = document.createElement("canvas");
+    readonly getCanvas = vi.fn(() => this.canvas);
     readonly addSource = vi.fn((id: string) => {
       this.sources.set(id, { setData: vi.fn() });
     });
@@ -65,26 +70,32 @@ vi.mock("mapbox-gl", () => {
       mapboxMocks.mapInstances.push(this);
     }
 
-    on(event: string, handler: EventHandler): void {
-      const handlers = this.handlers.get(event) ?? new Set<EventHandler>();
-      handlers.add(handler);
-      this.handlers.set(event, handlers);
+    on(event: string, handler: EventHandler): void;
+    on(event: string, layerId: string, handler: EventHandler): void;
+    on(event: string, layerIdOrHandler: string | EventHandler, handler?: EventHandler): void {
+      const key = typeof layerIdOrHandler === "string" ? `${event}:${layerIdOrHandler}` : event;
+      const eventHandler = typeof layerIdOrHandler === "function" ? layerIdOrHandler : handler;
+      if (!eventHandler) return;
+      const handlers = this.handlers.get(key) ?? new Set<EventHandler>();
+      handlers.add(eventHandler);
+      this.handlers.set(key, handlers);
     }
 
-    trigger(event: string): void {
-      this.handlers.get(event)?.forEach((handler) => {
-        handler();
+    trigger(event: string, layerId?: string, payload?: Parameters<EventHandler>[0]): void {
+      const key = layerId ? `${event}:${layerId}` : event;
+      this.handlers.get(key)?.forEach((handler) => {
+        handler(payload);
       });
     }
   }
 
   class MockMarker implements MockMarkerInstance {
-    readonly element: HTMLDivElement;
+    readonly element: HTMLButtonElement;
     readonly remove = vi.fn();
     readonly setLngLat = vi.fn(() => this);
     readonly addTo = vi.fn(() => this);
 
-    constructor(options: { element: HTMLDivElement }) {
+    constructor(options: { element: HTMLButtonElement }) {
       this.element = options.element;
       mapboxMocks.markerConstructor(options);
       mapboxMocks.markerInstances.push(this);
@@ -262,7 +273,7 @@ describe("PlannerMap", () => {
     );
     expect(selectedMarker?.element.style.zIndex).toBe("10");
     expect(selectedMarker?.element.querySelectorAll("span")[1]).toHaveStyle({
-      transform: "scale(1.2)",
+      transform: "scale(1.35)",
     });
 
     map.easeTo.mockClear();
@@ -335,6 +346,124 @@ describe("PlannerMap", () => {
     expect(usePlannerViewStore.getState().mapFocusRequest).toBeNull();
     expect(map.easeTo).not.toHaveBeenCalled();
     expect(map.fitBounds).not.toHaveBeenCalled();
+  });
+
+  it("shares hover state with the schedule and selects a marker while revealing its ancestors", () => {
+    render(<PlannerMap accessToken="pk.test" />);
+    const map = mapboxMocks.mapInstances[0];
+
+    act(() => {
+      map.trigger("load");
+    });
+    const airportMarker = mapboxMocks.markerInstances.find(({ element }) =>
+      element.textContent?.includes("제주국제공항"),
+    );
+    expect(airportMarker?.element).toHaveAttribute("aria-label", "제주국제공항 일정 선택");
+
+    act(() => {
+      airportMarker?.element.dispatchEvent(new Event("pointerenter"));
+    });
+    expect(usePlannerViewStore.getState().hoveredItemId).toBe("day-one-airport");
+    expect(airportMarker?.element.querySelectorAll("span")[1]).toHaveStyle({
+      transform: "scale(1.35)",
+    });
+
+    // 마커 아래에 경로선이 깔려 있어도 지도 click 핸들러가 Day를 대신 선택하지 않아야 한다.
+    const canvasContainer = document.createElement("div");
+    const containerClick = vi.fn();
+    canvasContainer.addEventListener("click", containerClick);
+    canvasContainer.append(airportMarker!.element);
+    document.body.append(canvasContainer);
+
+    act(() => {
+      airportMarker?.element.dispatchEvent(new Event("pointerleave"));
+      airportMarker?.element.click();
+    });
+    expect(containerClick).not.toHaveBeenCalled();
+    const state = usePlannerViewStore.getState();
+    expect(state.hoveredItemId).toBeNull();
+    expect(state.selectedItemId).toBe("day-one-airport");
+    expect([...state.expandedIds]).toEqual(
+      expect.arrayContaining(["root", "region-jeju", "day-one"]),
+    );
+  });
+
+  it("shares route hover and click with its Day row", () => {
+    render(<PlannerMap accessToken="pk.test" />);
+    const map = mapboxMocks.mapInstances[0];
+
+    act(() => {
+      map.trigger("load");
+    });
+    act(() => {
+      map.trigger("mousemove", "planner-route-lines", {
+        features: [{ properties: { dayPathId: "day-one" } }],
+      });
+    });
+    expect(usePlannerViewStore.getState().hoveredItemId).toBe("day-one");
+    expect(map.getCanvas().style.cursor).toBe("pointer");
+    // 굵기는 즉시 튀지 않고 진행도 0에서 시작해 프레임마다 보간된다.
+    const routeSource = map.getSource("planner-routes") as MockSource;
+    expect(routeSource.setData).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        features: expect.arrayContaining([
+          expect.objectContaining({
+            properties: expect.objectContaining({
+              dayPathId: "day-one",
+              isHovered: true,
+              hoverProgress: 0,
+            }),
+          }),
+        ]),
+      }),
+    );
+
+    act(() => {
+      map.trigger("mouseleave", "planner-route-lines");
+    });
+    expect(usePlannerViewStore.getState().hoveredItemId).toBeNull();
+    expect(map.getCanvas().style.cursor).toBe("");
+
+    act(() => {
+      map.trigger("click", "planner-route-lines", {
+        features: [{ properties: { dayPathId: "day-one" } }],
+      });
+    });
+    expect(usePlannerViewStore.getState().selectedItemId).toBe("day-one");
+    expect(map.fitBounds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ duration: 500 }),
+    );
+  });
+
+  it("keeps marker hover while the pointer sits on a route line beneath the marker", () => {
+    render(<PlannerMap accessToken="pk.test" />);
+    const map = mapboxMocks.mapInstances[0];
+
+    act(() => {
+      map.trigger("load");
+    });
+    const airportMarker = mapboxMocks.markerInstances.find(({ element }) =>
+      element.textContent?.includes("제주국제공항"),
+    );
+
+    // 마커 위 포인터 이동도 지도까지 전달되므로 마커 아래 경로선이 hover를 가져가면 안 된다.
+    act(() => {
+      airportMarker?.element.dispatchEvent(new Event("pointerenter"));
+      map.trigger("mousemove", "planner-route-lines", {
+        features: [{ properties: { dayPathId: "day-one" } }],
+      });
+    });
+    expect(usePlannerViewStore.getState().hoveredItemId).toBe("day-one-airport");
+
+    // 마커를 벗어나 다시 선 위에 남으면 그 때 선이 hover를 넘겨받는다.
+    act(() => {
+      airportMarker?.element.dispatchEvent(new Event("pointerleave"));
+      map.trigger("mousemove", "planner-route-lines", {
+        features: [{ properties: { dayPathId: "day-one" } }],
+      });
+    });
+    expect(usePlannerViewStore.getState().hoveredItemId).toBe("day-one");
   });
 
   it("returns to the complete visible schedule from the map control", async () => {

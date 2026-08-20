@@ -23,6 +23,7 @@ type PlannerViewState = {
   readonly rootPathId: PlannerNodePathId | null;
   readonly expandedIds: ReadonlySet<PlannerNodePathId>;
   readonly selectedItemId: PlannerNodePathId | null;
+  readonly hoveredItemId: PlannerNodePathId | null;
   readonly mapFocusRequest: Readonly<{ pathId: PlannerNodePathId }> | null;
   readonly multiSelectedIds: readonly PlannerNodePathId[];
   readonly selectionRangeIds: readonly PlannerNodePathId[];
@@ -40,6 +41,7 @@ type PlannerViewActions = {
   collapseAll: () => void;
   moveNode: (pathId: PlannerNodePathId, destination: Readonly<PlannerDropDestination>) => void;
   activateItem: (pathId: PlannerNodePathId) => void;
+  setHoveredItem: (pathId: PlannerNodePathId | null) => void;
   selectItem: (pathId: PlannerNodePathId, extendSelection?: boolean) => void;
   clearSelection: () => void;
   setActiveModule: (module: PlannerModule) => void;
@@ -65,6 +67,7 @@ function createInitialState(): PlannerViewState {
     rootPathId: null,
     expandedIds: new Set(),
     selectedItemId: null,
+    hoveredItemId: null,
     mapFocusRequest: null,
     multiSelectedIds: [],
     selectionRangeIds: [],
@@ -86,6 +89,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
       rootPathId: rootNode?.pathId ?? null,
       expandedIds: new Set(rootNode ? [rootNode.pathId] : []),
       selectedItemId: null,
+      hoveredItemId: null,
       mapFocusRequest: null,
       multiSelectedIds: [],
       selectionRangeIds: [],
@@ -111,6 +115,10 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
         selectedItemId:
           state.selectedItemId && tree.entityMap.has(state.selectedItemId)
             ? state.selectedItemId
+            : null,
+        hoveredItemId:
+          state.hoveredItemId && tree.entityMap.has(state.hoveredItemId)
+            ? state.hoveredItemId
             : null,
         multiSelectedIds: state.multiSelectedIds.filter((pathId) => tree.entityMap.has(pathId)),
         selectionRangeIds: state.selectionRangeIds.filter((pathId) => tree.entityMap.has(pathId)),
@@ -194,6 +202,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
         nodes,
         tree: buildPlannerTree(nodes),
         selectedItemId: pathId,
+        hoveredItemId: null,
         mapFocusRequest: null,
         multiSelectedIds: [],
         selectionRangeIds: [],
@@ -201,18 +210,38 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
     });
   },
   activateItem(pathId) {
-    const currentItem = get().tree.entityMap.get(pathId);
+    const state = get();
+    const currentItem = state.tree.entityMap.get(pathId);
     if (!currentItem) {
       return;
+    }
+
+    const expandedIds = new Set(state.expandedIds);
+    let ancestor = currentItem.parentPathId
+      ? state.tree.entityMap.get(currentItem.parentPathId)
+      : undefined;
+    while (ancestor) {
+      expandedIds.add(ancestor.pathId);
+      ancestor = ancestor.parentPathId
+        ? state.tree.entityMap.get(ancestor.parentPathId)
+        : undefined;
     }
 
     // 같은 노드를 다시 눌러도 새 요청 객체를 만들어 지도 포커스를 다시 실행한다.
     set({
       selectedItemId: pathId,
+      hoveredItemId: null,
       mapFocusRequest: { pathId },
       multiSelectedIds: [],
       selectionRangeIds: [],
+      expandedIds,
     });
+  },
+  setHoveredItem(hoveredItemId) {
+    if (hoveredItemId && !get().tree.entityMap.has(hoveredItemId)) {
+      return;
+    }
+    set({ hoveredItemId });
   },
   selectItem(pathId, extendSelection = false) {
     const state = get();
@@ -267,6 +296,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
   clearSelection() {
     set({
       selectedItemId: null,
+      hoveredItemId: null,
       mapFocusRequest: null,
       multiSelectedIds: [],
       selectionRangeIds: [],

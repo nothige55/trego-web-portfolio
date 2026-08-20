@@ -36,6 +36,7 @@ import {
 import { PlannerDateRangePopover } from "@/features/planner/components/planner-date-range-popover";
 import { PlannerNodeCreateDialog } from "@/features/planner/components/planner-node-create-dialog";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
+import { PlannerRouteInfo } from "@/features/planner/components/planner-route-info";
 import { PLANNER_DAY_COLORS } from "@/features/planner/data/planner-day-colors";
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import { calculatePlannerDragFootprintHeight } from "@/features/planner/dnd/resolve-planner-drop";
@@ -47,6 +48,7 @@ import { usePlannerHistoryStore } from "@/features/planner/stores/planner-histor
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type {
   FlattenedPlannerNode,
+  PlannerActivityNode,
   PlannerNodePathId,
 } from "@/features/planner/types/planner-node";
 import { getPlannerBreadcrumbAncestors } from "@/features/planner/utils/get-planner-breadcrumb-ancestors";
@@ -95,6 +97,7 @@ function PlannerTreeItem({
   isMemoSubmitting,
   memoDraft,
   memoError,
+  previousActivity,
   onBeginEditing,
   onCancelMemoEditing,
   onCancelEditing,
@@ -119,6 +122,7 @@ function PlannerTreeItem({
   readonly isMemoSubmitting: boolean;
   readonly memoDraft: string;
   readonly memoError: string | null;
+  readonly previousActivity?: PlannerActivityNode;
   readonly onBeginEditing: (node: FlattenedPlannerNode) => void;
   readonly onCancelMemoEditing: () => void;
   readonly onCancelEditing: () => void;
@@ -131,11 +135,13 @@ function PlannerTreeItem({
   const childrenMap = usePlannerViewStore((state) => state.tree.childrenMap);
   const expandedIds = usePlannerViewStore((state) => state.expandedIds);
   const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
+  const hoveredItemId = usePlannerViewStore((state) => state.hoveredItemId);
   const multiSelectedIds = usePlannerViewStore((state) => state.multiSelectedIds);
   const selectionRangeIds = usePlannerViewStore((state) => state.selectionRangeIds);
   const toggleExpanded = usePlannerViewStore((state) => state.toggleExpanded);
   const activateItem = usePlannerViewStore((state) => state.activateItem);
   const selectItem = usePlannerViewStore((state) => state.selectItem);
+  const setHoveredItem = usePlannerViewStore((state) => state.setHoveredItem);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const currentDayColorIndex = PLANNER_DAY_COLORS.findIndex((color) => color === node.color);
   const [dayColorStartIndex, setDayColorStartIndex] = useState(currentDayColorIndex);
@@ -158,6 +164,7 @@ function PlannerTreeItem({
   // 선택 상태는 유지하되 drag overlay와 중복 강조되지 않도록 목록 배경만 숨긴다.
   const isSelectedHighlightVisible = isSelected && !suppressSelectionHighlight;
   const isSelectionContextHighlightVisible = isSelectionContext && !suppressSelectionHighlight;
+  const isMapHovered = hoveredItemId === node.pathId;
   // 기존 Planner와 같이 root 다음 계층부터 30px 단위로 들여쓴다.
   // 별도의 20px 토글 칸을 항상 유지해 자식 유무와 관계없이 라벨 시작점을 맞춘다.
   const indentation = Math.max(0, node.depth - 1) * 30;
@@ -194,6 +201,7 @@ function PlannerTreeItem({
       aria-expanded={hasChildren ? isExpanded : undefined}
       aria-selected={isSelected}
       data-selection-state={isSelected ? "selected" : isSelectionContext ? "range" : undefined}
+      data-map-highlight={isMapHovered ? "hovered" : undefined}
       data-drop-state={isChildTarget ? "child" : isExpandingTarget ? "expanding" : undefined}
       className={`relative touch-none list-none ${
         isSortable ? "cursor-grab active:cursor-grabbing" : "cursor-default"
@@ -221,6 +229,13 @@ function PlannerTreeItem({
           />
         </div>
       ) : null}
+      {node.kind === "activity" && previousActivity ? (
+        <PlannerRouteInfo
+          activity={node}
+          previousActivity={previousActivity}
+          indentation={indentation}
+        />
+      ) : null}
       <ContextMenu
         onOpenChange={(isOpen) => {
           if (isOpen) {
@@ -238,11 +253,19 @@ function PlannerTreeItem({
                     ? "border-brand/60 bg-brand/5 text-foreground"
                     : isSelectedHighlightVisible
                       ? "border-brand bg-brand/10 text-foreground"
-                      : isSelectionContextHighlightVisible
-                        ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
-                        : "border-transparent text-foreground hover:bg-muted/70"
+                      : isMapHovered
+                        ? "border-brand/70 bg-brand/10 text-foreground"
+                        : isSelectionContextHighlightVisible
+                          ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
+                          : "border-transparent text-foreground hover:bg-muted/70"
               }`}
               style={{ paddingLeft: indentation }}
+              onPointerEnter={() => setHoveredItem(node.pathId)}
+              onPointerLeave={() => {
+                if (usePlannerViewStore.getState().hoveredItemId === node.pathId) {
+                  setHoveredItem(null);
+                }
+              }}
             />
           }
         >
@@ -611,6 +634,13 @@ export function PlannerSchedulePanel({
     () => getVisiblePlannerNodes(tree.flattenedItems, expandedIds, tree.childrenMap),
     [expandedIds, tree.childrenMap, tree.flattenedItems],
   );
+  useLayoutEffect(() => {
+    if (!selectedItemId) return;
+    const selectedElement = itemRefs.current.get(selectedItemId);
+    if (typeof selectedElement?.scrollIntoView === "function") {
+      selectedElement.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedItemId, visibleItems]);
   const dayNumberByPathId = useMemo(() => {
     const startDateValue = projectDetails?.startDate.slice(0, 10) ?? "1970-01-01";
     const startDate = new Date(`${startDateValue}T00:00:00Z`);
@@ -923,6 +953,22 @@ export function PlannerSchedulePanel({
                 ) : null}
                 {sortableItems.map((node, index) => {
                   const nextItem = sortableItems[index + 1];
+                  const parent = node.parentPathId
+                    ? tree.entityMap.get(node.parentPathId)
+                    : undefined;
+                  const siblings = tree.childrenMap.get(node.parentPathId) ?? [];
+                  const siblingIndex = siblings.findIndex(
+                    (sibling) => sibling.pathId === node.pathId,
+                  );
+                  const previousSibling = siblingIndex > 0 ? siblings[siblingIndex - 1] : undefined;
+                  const previousActivity =
+                    node.kind === "activity" &&
+                    node.activityType !== "group" &&
+                    parent?.kind === "day" &&
+                    previousSibling?.kind === "activity" &&
+                    previousSibling.activityType !== "group"
+                      ? previousSibling
+                      : undefined;
                   const boundaryAncestor =
                     !activePathId &&
                     nextItem?.depth === 1 &&
@@ -950,6 +996,7 @@ export function PlannerSchedulePanel({
                       isMemoSubmitting={isMemoSubmitting}
                       memoDraft={memoEditingPathId === node.pathId ? memoDraft : ""}
                       memoError={memoEditingPathId === node.pathId ? memoError : null}
+                      previousActivity={previousActivity}
                       onBeginEditing={beginEditing}
                       onCancelMemoEditing={cancelMemoEditing}
                       onCancelEditing={cancelEditing}

@@ -139,10 +139,12 @@ export function buildPlannerMapModel({
   tree,
   hiddenDayIds,
   selectedItemId,
+  hoveredItemId = null,
 }: {
   readonly tree: PlannerTree;
   readonly hiddenDayIds: ReadonlySet<PlannerNodePathId>;
   readonly selectedItemId: PlannerNodePathId | null;
+  readonly hoveredItemId?: PlannerNodePathId | null;
 }): PlannerMapModel {
   const markers: PlannerMapMarker[] = [];
   const routes: PlannerMapRoute[] = [];
@@ -176,6 +178,7 @@ export function buildPlannerMapModel({
         coordinate,
         opacity,
         isSelected: activity.pathId === selectedItemId,
+        isHovered: activity.pathId === hoveredItemId,
       });
 
       if (container.kind === "day") {
@@ -189,6 +192,7 @@ export function buildPlannerMapModel({
         color,
         coordinates: routeCoordinates,
         opacity,
+        isHovered: container.pathId === hoveredItemId,
       });
     }
   });
