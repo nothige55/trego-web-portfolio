@@ -313,6 +313,32 @@ describe("PlannerSchedulePanel", () => {
     expect(commands.deleteNode).toHaveBeenCalledWith({ pathId: "day-one-airport" });
   });
 
+  it("shares row hover with the map and shows route assistance between scheduled places", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(<PlannerWorkspace isNodeMoveEnabled onMoveNode={vi.fn()} projectId="demo" />);
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+    const airportItem = within(tree).getByText("제주국제공항").closest("[role=treeitem]");
+    const airportSurface = airportItem?.querySelector('[data-slot="context-menu-trigger"]');
+    expect(airportSurface).not.toBeNull();
+
+    fireEvent.pointerEnter(airportSurface!);
+    expect(usePlannerViewStore.getState().hoveredItemId).toBe("day-one-airport");
+    expect(airportItem).toHaveAttribute("data-map-highlight", "hovered");
+
+    fireEvent.pointerLeave(airportSurface!);
+    expect(usePlannerViewStore.getState().hoveredItemId).toBeNull();
+    expect(airportItem).not.toHaveAttribute("data-map-highlight");
+
+    expect(screen.getByTestId("planner-route-day-one-iho")).toHaveTextContent(
+      "직선 3.9km자동차 15분길찾기",
+    );
+  });
+
   it("keeps Activity names read-only and edits only their memo", async () => {
     const commands = createPlannerCommands();
     const user = userEvent.setup();

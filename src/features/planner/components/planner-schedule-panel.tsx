@@ -36,6 +36,7 @@ import {
 import { PlannerDateRangePopover } from "@/features/planner/components/planner-date-range-popover";
 import { PlannerNodeCreateDialog } from "@/features/planner/components/planner-node-create-dialog";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
+import { PlannerRouteInfo } from "@/features/planner/components/planner-route-info";
 import { PLANNER_DAY_COLORS } from "@/features/planner/data/planner-day-colors";
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import { calculatePlannerDragFootprintHeight } from "@/features/planner/dnd/resolve-planner-drop";
@@ -47,6 +48,7 @@ import { usePlannerHistoryStore } from "@/features/planner/stores/planner-histor
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type {
   FlattenedPlannerNode,
+  PlannerActivityNode,
   PlannerNodePathId,
 } from "@/features/planner/types/planner-node";
 import { getPlannerBreadcrumbAncestors } from "@/features/planner/utils/get-planner-breadcrumb-ancestors";
@@ -95,6 +97,7 @@ function PlannerTreeItem({
   isMemoSubmitting,
   memoDraft,
   memoError,
+  previousActivity,
   onBeginEditing,
   onCancelMemoEditing,
   onCancelEditing,
@@ -119,6 +122,7 @@ function PlannerTreeItem({
   readonly isMemoSubmitting: boolean;
   readonly memoDraft: string;
   readonly memoError: string | null;
+  readonly previousActivity?: PlannerActivityNode;
   readonly onBeginEditing: (node: FlattenedPlannerNode) => void;
   readonly onCancelMemoEditing: () => void;
   readonly onCancelEditing: () => void;
@@ -224,6 +228,13 @@ function PlannerTreeItem({
             className="w-full"
           />
         </div>
+      ) : null}
+      {node.kind === "activity" && previousActivity ? (
+        <PlannerRouteInfo
+          activity={node}
+          previousActivity={previousActivity}
+          indentation={indentation}
+        />
       ) : null}
       <ContextMenu
         onOpenChange={(isOpen) => {
@@ -942,6 +953,22 @@ export function PlannerSchedulePanel({
                 ) : null}
                 {sortableItems.map((node, index) => {
                   const nextItem = sortableItems[index + 1];
+                  const parent = node.parentPathId
+                    ? tree.entityMap.get(node.parentPathId)
+                    : undefined;
+                  const siblings = tree.childrenMap.get(node.parentPathId) ?? [];
+                  const siblingIndex = siblings.findIndex(
+                    (sibling) => sibling.pathId === node.pathId,
+                  );
+                  const previousSibling = siblingIndex > 0 ? siblings[siblingIndex - 1] : undefined;
+                  const previousActivity =
+                    node.kind === "activity" &&
+                    node.activityType !== "group" &&
+                    parent?.kind === "day" &&
+                    previousSibling?.kind === "activity" &&
+                    previousSibling.activityType !== "group"
+                      ? previousSibling
+                      : undefined;
                   const boundaryAncestor =
                     !activePathId &&
                     nextItem?.depth === 1 &&
@@ -969,6 +996,7 @@ export function PlannerSchedulePanel({
                       isMemoSubmitting={isMemoSubmitting}
                       memoDraft={memoEditingPathId === node.pathId ? memoDraft : ""}
                       memoError={memoEditingPathId === node.pathId ? memoError : null}
+                      previousActivity={previousActivity}
                       onBeginEditing={beginEditing}
                       onCancelMemoEditing={cancelMemoEditing}
                       onCancelEditing={cancelEditing}
