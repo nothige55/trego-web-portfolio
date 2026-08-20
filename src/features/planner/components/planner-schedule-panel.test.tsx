@@ -6,6 +6,12 @@ import { demoPlannerProject } from "@/features/planner/data/demo-planner";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import { fireEvent, render, screen, userEvent, waitFor, within } from "@/testing/test-utils";
 
+// jsdom에는 WebGL이 없어 실제 PlannerMap은 항상 초기화에 실패하고 role="alert" 안내를 띄운다.
+// 이 파일이 검증하는 일정 패널과 무관하므로 지도는 대체한다.
+vi.mock("@/features/planner/components/planner-map", () => ({
+  PlannerMap: () => <section aria-label="지도 영역" />,
+}));
+
 const dndState = vi.hoisted(() => ({
   activePathId: null as string | null,
   moveNode: null as ((pathId: string, destination: unknown) => void) | null,
