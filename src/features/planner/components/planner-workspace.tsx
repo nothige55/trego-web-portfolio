@@ -10,6 +10,7 @@ import { usePlannerViewStore } from "@/features/planner/stores/planner-view-stor
 
 type PlannerWorkspaceProps = {
   readonly chatContent?: ReactNode;
+  readonly exploreContent?: ReactNode;
   readonly isNodeMoveEnabled: boolean;
   readonly onMoveNode: PlannerNodeMoveHandler;
   readonly plannerCommands?: PlannerNodeEditingCommands;
@@ -40,6 +41,7 @@ function PlannerMapModuleLoading() {
 // 일정, 보조 모듈, 지도 영역을 배치하되 각 영역의 세부 동작은 하위 컴포넌트가 소유한다.
 export function PlannerWorkspace({
   chatContent,
+  exploreContent,
   isNodeMoveEnabled,
   onMoveNode,
   plannerCommands,
@@ -59,7 +61,9 @@ export function PlannerWorkspace({
         onMoveNode={onMoveNode}
       />
       {/* 접힌 패널은 DOM에서도 제거해 남은 공간을 지도 영역이 모두 사용하게 한다. */}
-      {isModuleCollapsed ? null : <PlannerModulePanel chatContent={chatContent} />}
+      {isModuleCollapsed ? null : (
+        <PlannerModulePanel chatContent={chatContent} exploreContent={exploreContent} />
+      )}
       <Suspense fallback={<PlannerMapModuleLoading />}>
         <PlannerMap />
       </Suspense>

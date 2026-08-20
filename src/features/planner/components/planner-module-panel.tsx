@@ -19,9 +19,10 @@ const modules: Array<{
 // app 계층에서 주입한 Chat UI와 아직 이식되지 않은 Explore placeholder를 전환한다.
 type PlannerModulePanelProps = {
   readonly chatContent?: ReactNode;
+  readonly exploreContent?: ReactNode;
 };
 
-export function PlannerModulePanel({ chatContent }: PlannerModulePanelProps) {
+export function PlannerModulePanel({ chatContent, exploreContent }: PlannerModulePanelProps) {
   const activeModule = usePlannerViewStore((state) => state.activeModule);
   const setActiveModule = usePlannerViewStore((state) => state.setActiveModule);
   const setModuleCollapsed = usePlannerViewStore((state) => state.setModuleCollapsed);
@@ -73,6 +74,8 @@ export function PlannerModulePanel({ chatContent }: PlannerModulePanelProps) {
       <div className="flex min-h-0 flex-1 p-4">
         {activeModule === "chat" && chatContent ? (
           chatContent
+        ) : activeModule === "explore" && exploreContent ? (
+          exploreContent
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-8 text-center">
             {activeModule === "explore" ? (
