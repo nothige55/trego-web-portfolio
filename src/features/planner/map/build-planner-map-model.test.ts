@@ -165,6 +165,7 @@ describe("buildPlannerMapModel", () => {
           [126.3, 33.3],
         ],
         opacity: 1,
+        isHovered: false,
       },
     ]);
   });

@@ -12,6 +12,7 @@ export interface PlannerMapMarker {
   readonly coordinate: PlannerMapCoordinate;
   readonly opacity: number;
   readonly isSelected: boolean;
+  readonly isHovered: boolean;
 }
 
 export interface PlannerMapRoute {
@@ -19,6 +20,7 @@ export interface PlannerMapRoute {
   readonly color: string;
   readonly coordinates: readonly PlannerMapCoordinate[];
   readonly opacity: number;
+  readonly isHovered: boolean;
 }
 
 export interface PlannerMapFocus {

@@ -131,11 +131,13 @@ function PlannerTreeItem({
   const childrenMap = usePlannerViewStore((state) => state.tree.childrenMap);
   const expandedIds = usePlannerViewStore((state) => state.expandedIds);
   const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
+  const hoveredItemId = usePlannerViewStore((state) => state.hoveredItemId);
   const multiSelectedIds = usePlannerViewStore((state) => state.multiSelectedIds);
   const selectionRangeIds = usePlannerViewStore((state) => state.selectionRangeIds);
   const toggleExpanded = usePlannerViewStore((state) => state.toggleExpanded);
   const activateItem = usePlannerViewStore((state) => state.activateItem);
   const selectItem = usePlannerViewStore((state) => state.selectItem);
+  const setHoveredItem = usePlannerViewStore((state) => state.setHoveredItem);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const currentDayColorIndex = PLANNER_DAY_COLORS.findIndex((color) => color === node.color);
   const [dayColorStartIndex, setDayColorStartIndex] = useState(currentDayColorIndex);
@@ -158,6 +160,7 @@ function PlannerTreeItem({
   // 선택 상태는 유지하되 drag overlay와 중복 강조되지 않도록 목록 배경만 숨긴다.
   const isSelectedHighlightVisible = isSelected && !suppressSelectionHighlight;
   const isSelectionContextHighlightVisible = isSelectionContext && !suppressSelectionHighlight;
+  const isMapHovered = hoveredItemId === node.pathId;
   // 기존 Planner와 같이 root 다음 계층부터 30px 단위로 들여쓴다.
   // 별도의 20px 토글 칸을 항상 유지해 자식 유무와 관계없이 라벨 시작점을 맞춘다.
   const indentation = Math.max(0, node.depth - 1) * 30;
@@ -194,6 +197,7 @@ function PlannerTreeItem({
       aria-expanded={hasChildren ? isExpanded : undefined}
       aria-selected={isSelected}
       data-selection-state={isSelected ? "selected" : isSelectionContext ? "range" : undefined}
+      data-map-highlight={isMapHovered ? "hovered" : undefined}
       data-drop-state={isChildTarget ? "child" : isExpandingTarget ? "expanding" : undefined}
       className={`relative touch-none list-none ${
         isSortable ? "cursor-grab active:cursor-grabbing" : "cursor-default"
@@ -238,11 +242,19 @@ function PlannerTreeItem({
                     ? "border-brand/60 bg-brand/5 text-foreground"
                     : isSelectedHighlightVisible
                       ? "border-brand bg-brand/10 text-foreground"
-                      : isSelectionContextHighlightVisible
-                        ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
-                        : "border-transparent text-foreground hover:bg-muted/70"
+                      : isMapHovered
+                        ? "border-brand/70 bg-brand/10 text-foreground"
+                        : isSelectionContextHighlightVisible
+                          ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
+                          : "border-transparent text-foreground hover:bg-muted/70"
               }`}
               style={{ paddingLeft: indentation }}
+              onPointerEnter={() => setHoveredItem(node.pathId)}
+              onPointerLeave={() => {
+                if (usePlannerViewStore.getState().hoveredItemId === node.pathId) {
+                  setHoveredItem(null);
+                }
+              }}
             />
           }
         >
@@ -611,6 +623,13 @@ export function PlannerSchedulePanel({
     () => getVisiblePlannerNodes(tree.flattenedItems, expandedIds, tree.childrenMap),
     [expandedIds, tree.childrenMap, tree.flattenedItems],
   );
+  useLayoutEffect(() => {
+    if (!selectedItemId) return;
+    const selectedElement = itemRefs.current.get(selectedItemId);
+    if (typeof selectedElement?.scrollIntoView === "function") {
+      selectedElement.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedItemId, visibleItems]);
   const dayNumberByPathId = useMemo(() => {
     const startDateValue = projectDetails?.startDate.slice(0, 10) ?? "1970-01-01";
     const startDate = new Date(`${startDateValue}T00:00:00Z`);
