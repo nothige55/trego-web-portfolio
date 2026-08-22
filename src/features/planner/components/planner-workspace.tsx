@@ -1,12 +1,12 @@
 import { lazy, type ReactNode, Suspense } from "react";
 
 import { PlannerModulePanel } from "@/features/planner/components/planner-module-panel";
-import {
-  type PlannerNodeEditingCommands,
-  type PlannerNodeMoveHandler,
-  PlannerSchedulePanel,
-} from "@/features/planner/components/planner-schedule-panel";
+import { PlannerSchedulePanel } from "@/features/planner/components/planner-schedule-panel";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
+import type {
+  PlannerNodeEditingCommands,
+  PlannerNodeMoveHandler,
+} from "@/features/planner/types/planner-editing-commands";
 
 type PlannerWorkspaceProps = {
   readonly chatContent?: ReactNode;

@@ -2,11 +2,11 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectPlannerPage } from "@/app/realtime/project-planner-page";
+import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type {
   PlannerNodeEditingCommands,
   PlannerNodeMoveHandler,
-} from "@/features/planner/components/planner-schedule-panel";
-import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
+} from "@/features/planner/types/planner-editing-commands";
 import type { ApiClient } from "@/lib/api-client";
 import type { SignalRClient, SignalRConnectionStatus } from "@/lib/signalr-client";
 import { fireEvent, render, screen, userEvent, waitFor } from "@/testing/test-utils";

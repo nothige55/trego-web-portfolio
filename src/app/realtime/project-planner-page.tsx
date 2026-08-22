@@ -24,10 +24,6 @@ import {
 } from "@/features/collaboration/realtime/cursor-presence-controller";
 import { MockPlaceExplorer } from "@/features/places/components/mock-place-explorer";
 import { getProjectDetails, getProjectNodes } from "@/features/planner/api/project-api";
-import type {
-  PlannerNodeEditingCommands,
-  PlannerNodeMoveHandler,
-} from "@/features/planner/components/planner-schedule-panel";
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
 import {
   buildPlannerDateRangeHistory,
@@ -51,6 +47,10 @@ import type { UpdatePathInput } from "@/features/planner/realtime/project-hub-pl
 import { usePlannerHistoryStore } from "@/features/planner/stores/planner-history-store";
 import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
+import type {
+  PlannerNodeEditingCommands,
+  PlannerNodeMoveHandler,
+} from "@/features/planner/types/planner-editing-commands";
 import { ProjectMemberInviteForm } from "@/features/project-management/components/project-member-invite-form";
 import type { ApiClient } from "@/lib/api-client";
 import { createApiClient } from "@/lib/api-client";
