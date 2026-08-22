@@ -132,6 +132,16 @@ export function PlannerSchedulePanel({
     handleDragCancel();
   };
   const activeNode = activePathId ? tree.entityMap.get(activePathId) : undefined;
+  // 미리보기도 행과 같은 기준으로 경로 정보 유무를 판단해야 시작 위치가 어긋나지 않는다.
+  const activeRowAdornments = activeNode
+    ? getPlannerRowAdornments({
+        node: activeNode,
+        tree,
+        rootPathId,
+        topItemId,
+        isDragging: true,
+      })
+    : undefined;
   const breadcrumbAncestors = useMemo(
     () => getPlannerBreadcrumbAncestors(topItemId, rootPathId, tree.entityMap),
     [rootPathId, topItemId, tree.entityMap],
@@ -251,6 +261,7 @@ export function PlannerSchedulePanel({
                 <PlannerDragPreview
                   node={activeNode}
                   dayNumber={dayNumberByPathId.get(activeNode.pathId)}
+                  previousActivity={activeRowAdornments?.previousActivity}
                 />
               </DragOverlay>
             ) : null}

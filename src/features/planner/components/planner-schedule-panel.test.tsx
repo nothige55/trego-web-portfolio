@@ -335,7 +335,7 @@ describe("PlannerSchedulePanel", () => {
     expect(airportItem).not.toHaveAttribute("data-map-highlight");
 
     expect(screen.getByTestId("planner-route-day-one-iho")).toHaveTextContent(
-      "직선 3.9km자동차 15분길찾기",
+      "3.9km자동차 15분길찾기",
     );
   });
 
