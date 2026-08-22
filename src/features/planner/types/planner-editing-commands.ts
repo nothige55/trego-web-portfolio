@@ -1,5 +1,6 @@
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import type { PlannerDateRangeInput } from "@/features/planner/operations/planner-date-range";
+import type { PlannerOperationCommand } from "@/features/planner/operations/planner-operation-command";
 import type { PlannerCreateNodeDraft } from "@/features/planner/operations/planner-operations";
 import type { PlannerRealtimeCommands } from "@/features/planner/realtime/planner-realtime";
 import type { PlannerNodePathId } from "@/features/planner/types/planner-node";
@@ -24,3 +25,13 @@ export type PlannerNodeEditingCommands = Pick<
   readonly undo?: () => Promise<void>;
   readonly updateDateRange?: (input: PlannerDateRangeInput) => Promise<void>;
 };
+
+// 실시간 명령 한 벌을 실행하고 그 역커맨드까지 히스토리에 남기는 실행기다.
+// 실행 경로는 app 레이어가 소유하므로 planner는 이 형태로만 주입받는다.
+export type PlannerRecordedOperationRunner = (
+  label: string,
+  redo: readonly PlannerOperationCommand[],
+  undo: readonly PlannerOperationCommand[],
+) => Promise<void>;
+
+export type PlannerHistoryReplayer = (direction: "redo" | "undo") => Promise<void>;
