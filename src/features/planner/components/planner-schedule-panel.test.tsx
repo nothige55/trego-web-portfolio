@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { PlannerNodeEditingCommands } from "@/features/planner/components/planner-schedule-panel";
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
 import { demoPlannerProject } from "@/features/planner/data/demo-planner";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
+import type { PlannerNodeEditingCommands } from "@/features/planner/types/planner-editing-commands";
 import { fireEvent, render, screen, userEvent, waitFor, within } from "@/testing/test-utils";
 
 // jsdom에는 WebGL이 없어 실제 PlannerMap은 항상 초기화에 실패하고 role="alert" 안내를 띄운다.
