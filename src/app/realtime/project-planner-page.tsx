@@ -572,7 +572,20 @@ function ProjectPlannerPageContent({
 
     return plannerNodes
       .filter((node) => selectedPathIds.has(node.pathId))
-      .map((node) => ({ kind: node.kind, name: node.name, pathId: node.pathId }));
+      .map((node) => ({
+        kind: node.kind,
+        name: node.name,
+        pathId: node.pathId,
+        parentPathId: node.parentPathId,
+        position: node.position,
+        ...(node.kind === "activity"
+          ? {
+              endTime: node.endTime,
+              memo: node.memo,
+              startTime: node.startTime,
+            }
+          : {}),
+      }));
   }, [multiSelectedIds, plannerNodes, selectedItemId]);
   const sendMessage = useMemo(() => createSendChatMessageCommand(client), [client]);
   const handleSend = useCallback(

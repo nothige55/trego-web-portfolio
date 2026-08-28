@@ -23,6 +23,7 @@ export const plannerTools = {
     description:
       "Create a reviewable set of Planner changes. This only proposes operations and never executes them.",
     inputSchema: plannerProposalSchema,
+    needsApproval: true,
   }),
 };
 

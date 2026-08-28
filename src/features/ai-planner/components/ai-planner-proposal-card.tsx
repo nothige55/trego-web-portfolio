@@ -1,14 +1,23 @@
-import { AlertTriangle, Check, Eye, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Eye, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { AiPlannerProposal } from "@/features/ai-planner/types/ai-planner";
+import type {
+  AiPlannerProposal,
+  AiPlannerProposalToolPart,
+} from "@/features/ai-planner/types/ai-planner";
 
 type AiPlannerProposalCardProps = {
+  readonly onReject?: () => void;
   readonly proposal: AiPlannerProposal;
+  readonly toolState?: AiPlannerProposalToolPart["state"];
 };
 
-export function AiPlannerProposalCard({ proposal }: AiPlannerProposalCardProps) {
+export function AiPlannerProposalCard({
+  onReject,
+  proposal,
+  toolState = "approval-requested",
+}: AiPlannerProposalCardProps) {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
     () => new Set(proposal.operations.map((operation) => operation.id)),
   );
@@ -18,6 +27,7 @@ export function AiPlannerProposalCard({ proposal }: AiPlannerProposalCardProps) 
     () => proposal.operations.filter((operation) => selectedIds.has(operation.id)),
     [proposal.operations, selectedIds],
   );
+  const isRejected = toolState === "output-denied";
 
   return (
     <section
@@ -31,12 +41,17 @@ export function AiPlannerProposalCard({ proposal }: AiPlannerProposalCardProps) 
           <Sparkles aria-hidden="true" className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold">일정 변경 제안</h3>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="text-sm font-semibold">일정 변경 제안</h3>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {isRejected ? "거절됨" : toolState === "approval-requested" ? "승인 필요" : "검토 중"}
+            </span>
+          </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{proposal.summary}</p>
         </div>
       </div>
 
-      <div className="mt-3 space-y-2">
+      <div className={`mt-3 space-y-2 ${isRejected ? "opacity-55" : ""}`}>
         {proposal.operations.map((operation) => {
           const isSelected = selectedIds.has(operation.id);
 
@@ -48,6 +63,7 @@ export function AiPlannerProposalCard({ proposal }: AiPlannerProposalCardProps) 
               <input
                 type="checkbox"
                 checked={isSelected}
+                disabled={isRejected}
                 aria-label={`${operation.label} 선택`}
                 className="mt-1 size-4 accent-brand"
                 onChange={() => {
@@ -89,28 +105,65 @@ export function AiPlannerProposalCard({ proposal }: AiPlannerProposalCardProps) 
         </p>
       ))}
 
-      {isPreviewing ? (
-        <p role="status" className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand">
-          <Check aria-hidden="true" className="size-3.5" />
-          선택한 변경 {selectedOperations.length}건의 미리보기가 준비되었습니다.
+      {isRejected ? (
+        <p role="status" className="mt-3 text-xs font-medium text-muted-foreground">
+          이 변경안은 적용 대상에서 제외되었습니다.
         </p>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={selectedCount === 0}
-          onClick={() => setIsPreviewing(true)}
+      {!isRejected && isPreviewing && selectedOperations.length > 0 ? (
+        <section
+          aria-label="선택한 변경 미리보기"
+          className="mt-3 rounded-lg border border-brand/25 bg-brand/5 p-2.5"
         >
-          <Eye aria-hidden="true" className="size-4" />
-          일정에서 미리보기
-        </Button>
-        <Button type="button" size="sm" disabled title="승인 실행 API 연결 후 사용할 수 있습니다">
-          선택한 변경 적용
-        </Button>
-      </div>
+          <p role="status" className="flex items-center gap-1.5 text-xs font-medium text-brand">
+            <Check aria-hidden="true" className="size-3.5" />
+            적용 전 diff · {selectedOperations.length}건
+          </p>
+          <div className="mt-2 space-y-2">
+            {selectedOperations.map((operation) => (
+              <article key={operation.id} className="rounded-md bg-background p-2">
+                <p className="text-[11px] font-semibold">{operation.label}</p>
+                <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 text-[10px] leading-4">
+                  <span className="rounded bg-muted px-1.5 py-1 text-muted-foreground line-through decoration-muted-foreground/60">
+                    {operation.before}
+                  </span>
+                  <ArrowRight aria-hidden="true" className="size-3 text-brand" />
+                  <span className="rounded bg-brand/10 px-1.5 py-1 font-medium text-foreground">
+                    {operation.after}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] leading-4 text-muted-foreground">
+            아직 Planner와 서버에는 반영되지 않았습니다.
+          </p>
+        </section>
+      ) : null}
+
+      {!isRejected ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={selectedCount === 0}
+            onClick={() => setIsPreviewing(true)}
+          >
+            <Eye aria-hidden="true" className="size-4" />
+            변경 전후 미리보기
+          </Button>
+          <Button type="button" size="sm" disabled title="승인 실행 API 연결 후 사용할 수 있습니다">
+            선택한 변경 적용
+          </Button>
+          {onReject ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onReject}>
+              변경안 거절
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

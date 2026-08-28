@@ -9,6 +9,7 @@ import type {
   AiPlannerContextItem,
   AiPlannerMessage,
   AiPlannerProposal,
+  AiPlannerProposalToolPart,
 } from "@/features/ai-planner/types/ai-planner";
 
 type AiPlannerPanelProps = {
@@ -19,9 +20,21 @@ type AiPlannerPanelProps = {
 const welcomeMessage: AiPlannerMessage = {
   id: "ai-planner-welcome",
   role: "assistant",
-  content:
-    "여행 일정에 관해 질문하거나 Planner 항목을 선택한 뒤 변경을 요청해 보세요. 변경은 검토와 승인 전에는 적용되지 않습니다.",
+  metadata: { createdAt: 0, source: "system" },
+  parts: [
+    {
+      type: "text",
+      text: "여행 일정에 관해 질문하거나 Planner 항목을 선택한 뒤 변경을 요청해 보세요. 변경은 검토와 승인 전에는 적용되지 않습니다.",
+    },
+  ],
 };
+
+function getMessageText(message: AiPlannerMessage): string {
+  return message.parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("");
+}
 
 export function AiPlannerPanel({
   client = mockAiPlannerClient,
@@ -48,6 +61,35 @@ export function AiPlannerPanel({
     setDraft("");
   }
 
+  function rejectProposal(toolCallId: string) {
+    setMessages((current) =>
+      current.map((message) => ({
+        ...message,
+        parts: message.parts.map((part) => {
+          if (
+            part.type !== "tool-proposePlannerOperations" ||
+            part.toolCallId !== toolCallId ||
+            (part.state !== "approval-requested" && part.state !== "input-available")
+          ) {
+            return part;
+          }
+
+          return {
+            type: "tool-proposePlannerOperations",
+            toolCallId: part.toolCallId,
+            state: "output-denied",
+            input: part.input,
+            approval: {
+              id: `approval-${part.toolCallId}`,
+              approved: false,
+              reason: "사용자가 변경안을 거절했습니다.",
+            },
+          } satisfies AiPlannerProposalToolPart;
+        }),
+      })),
+    );
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!trimmedDraft || isGenerating) return;
@@ -57,7 +99,11 @@ export function AiPlannerPanel({
     const userMessage: AiPlannerMessage = {
       id: globalThis.crypto.randomUUID(),
       role: "user",
-      content: prompt,
+      metadata: { createdAt: Date.now(), source: client.source },
+      parts: [
+        { type: "text", text: prompt },
+        { type: "data-planner-context", data: { items: contextSnapshot } },
+      ],
     };
     const nextMessages = [...messages, userMessage];
     const assistantMessageId = globalThis.crypto.randomUUID();
@@ -71,11 +117,33 @@ export function AiPlannerPanel({
     function updateAssistantMessage(content: string, proposal?: AiPlannerProposal) {
       setMessages((current) => {
         const currentAssistant = current.find((message) => message.id === assistantMessageId);
+        const currentProposalPart = currentAssistant?.parts.find(
+          (part) => part.type === "tool-proposePlannerOperations",
+        );
+        const nextContent = content || (currentAssistant ? getMessageText(currentAssistant) : "");
         const nextAssistant: AiPlannerMessage = {
           id: assistantMessageId,
           role: "assistant",
-          content: content || currentAssistant?.content || "변경안을 검토해 주세요.",
-          proposal: proposal ?? currentAssistant?.proposal,
+          metadata: { createdAt: Date.now(), source: client.source },
+          parts: [
+            {
+              type: "text",
+              text: nextContent || "변경안을 검토해 주세요.",
+            },
+            ...(proposal
+              ? [
+                  {
+                    type: "tool-proposePlannerOperations" as const,
+                    toolCallId: proposal.id,
+                    state: "approval-requested" as const,
+                    input: proposal,
+                    approval: { id: `approval-${proposal.id}` },
+                  },
+                ]
+              : currentProposalPart
+                ? [currentProposalPart]
+                : []),
+          ],
         };
 
         return currentAssistant
@@ -91,9 +159,11 @@ export function AiPlannerPanel({
         for await (const event of client.stream(
           {
             contextItems: contextSnapshot,
-            messages: nextMessages
-              .filter((message) => message.id !== welcomeMessage.id)
-              .map(({ content, role }) => ({ content, role })),
+            messages: nextMessages.flatMap((message) =>
+              message.id === welcomeMessage.id || message.role === "system"
+                ? []
+                : [{ content: getMessageText(message), role: message.role }],
+            ),
           },
           { signal: abortController.signal },
         )) {
@@ -178,8 +248,52 @@ export function AiPlannerPanel({
                   AI 플래너
                 </p>
               ) : null}
-              <p>{message.content}</p>
-              {message.proposal ? <AiPlannerProposalCard proposal={message.proposal} /> : null}
+              {message.parts.map((part) => {
+                if (part.type === "text") {
+                  return <p key={`${message.id}-text`}>{part.text}</p>;
+                }
+
+                if (part.type === "data-planner-context") {
+                  if (part.data.items.length === 0) return null;
+
+                  return (
+                    <aside
+                      key={`${message.id}-planner-context`}
+                      aria-label="이 메시지의 참고 일정"
+                      className="mt-2 border-t border-brand-foreground/25 pt-2"
+                    >
+                      <p className="text-[10px] font-medium opacity-75">참고 일정 snapshot</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {part.data.items.map((item) => (
+                          <span
+                            key={item.pathId}
+                            className="max-w-full truncate rounded-full bg-background/20 px-2 py-0.5 text-[10px]"
+                          >
+                            {item.name}
+                          </span>
+                        ))}
+                      </div>
+                    </aside>
+                  );
+                }
+
+                if (
+                  part.type === "tool-proposePlannerOperations" &&
+                  part.state !== "input-streaming" &&
+                  part.input
+                ) {
+                  return (
+                    <AiPlannerProposalCard
+                      key={part.toolCallId}
+                      onReject={() => rejectProposal(part.toolCallId)}
+                      proposal={part.input}
+                      toolState={part.state}
+                    />
+                  );
+                }
+
+                return null;
+              })}
             </div>
           </article>
         ))}

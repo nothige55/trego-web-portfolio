@@ -1,9 +1,16 @@
+import type { ToolUIPart, UIMessage } from "ai";
+
 export type AiPlannerContextKind = "activity" | "day" | "folder";
 
 export interface AiPlannerContextItem {
+  readonly endTime?: string | null;
   readonly kind: AiPlannerContextKind;
+  readonly memo?: string | null;
   readonly name: string;
+  readonly parentPathId?: string | null;
   readonly pathId: string;
+  readonly position?: number;
+  readonly startTime?: string | null;
 }
 
 export type AiPlannerOperationType =
@@ -30,16 +37,48 @@ export interface AiPlannerProposal {
   readonly warnings: readonly string[];
 }
 
-export interface AiPlannerMessage {
+export interface AiPlannerGeneratedResponse {
   readonly content: string;
-  readonly id: string;
   readonly proposal?: AiPlannerProposal;
+}
+
+export type AiPlannerMessageMetadata = {
+  readonly createdAt: number;
+  readonly source: "api" | "mock" | "system";
+};
+
+export type AiPlannerDataParts = {
+  readonly "planner-context": {
+    readonly items: readonly AiPlannerContextItem[];
+  };
+};
+
+export type AiPlannerUiTools = {
+  readonly proposePlannerOperations: {
+    readonly input: AiPlannerProposal;
+    readonly output: {
+      readonly appliedOperationIds: readonly string[];
+      readonly status: "applied" | "rejected";
+    };
+  };
+};
+
+export type AiPlannerMessage = UIMessage<
+  AiPlannerMessageMetadata,
+  AiPlannerDataParts,
+  AiPlannerUiTools
+>;
+
+export type AiPlannerProposalToolPart = ToolUIPart<AiPlannerUiTools>;
+
+export interface AiPlannerHistoryMessage {
+  readonly content: string;
   readonly role: "assistant" | "user";
 }
 
 export interface AiPlannerChatInput {
   readonly contextItems: readonly AiPlannerContextItem[];
-  readonly messages: readonly Pick<AiPlannerMessage, "content" | "role">[];
+  readonly messages: readonly AiPlannerHistoryMessage[];
 }
 
 export type AiPlannerChatEvent =
