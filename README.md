@@ -171,6 +171,7 @@ REST API와 SignalR Hub를 제공하는 백엔드가 필요합니다. 개발 시
 | 환경변수                   | 필수        | 설명                                                                   |
 | -------------------------- | ----------- | ---------------------------------------------------------------------- |
 | `VITE_API_BASE_URL`        | 선택        | REST API 기준 URL. 절대 URL이어야 합니다                               |
+| `VITE_AI_PLANNER_MODE`     | 선택        | AI 플래너 전송 방식. `mock`(기본) 또는 `api`                           |
 | `VITE_SIGNALR_HUB_URL`     | 선택        | SignalR Hub URL. 절대 URL 또는 root-relative 경로                      |
 | `VITE_MAPBOX_ACCESS_TOKEN` | 지도에 필요 | 없으면 지도 영역만 안내 문구로 대체되고 나머지 Planner UI는 동작합니다 |
 

@@ -1,16 +1,22 @@
 import { useCallback, useMemo, useState } from "react";
 
+import { ProjectChatTabs } from "@/app/realtime/project-chat-tabs";
 import { ProjectPlannerFallbackScreen } from "@/app/realtime/project-planner-fallback-screen";
 import { useProjectRealtime } from "@/app/realtime/project-realtime-context";
 import {
   ProjectRealtimeProvider,
   ProjectRealtimeStatusBanner,
 } from "@/app/realtime/project-realtime-provider";
+import { useAiPlannerContext } from "@/app/realtime/use-ai-planner-context";
 import {
   type ProjectDataState,
   useProjectDataLoader,
 } from "@/app/realtime/use-project-data-loader";
 import { useProjectRealtimeSubscriptions } from "@/app/realtime/use-project-realtime-subscriptions";
+import { env } from "@/config/env";
+import { createAiPlannerApiClient } from "@/features/ai-planner/api/ai-planner-api-client";
+import { mockAiPlannerClient } from "@/features/ai-planner/api/mock-ai-planner-client";
+import { AiPlannerPanel } from "@/features/ai-planner/components/ai-planner-panel";
 import type { AuthSession } from "@/features/auth/types";
 import {
   type ChatMessage,
@@ -154,6 +160,18 @@ function ProjectPlannerPageContent({
     isEnabled: isReady,
     updatePath: updatePlannerPath,
   });
+  const aiContextItems = useAiPlannerContext();
+  const aiPlannerClient = useMemo(
+    () =>
+      env.aiPlannerMode === "api"
+        ? createAiPlannerApiClient({
+            accessToken: identity.accessToken,
+            apiBaseUrl: env.apiBaseUrl,
+            projectId,
+          })
+        : mockAiPlannerClient,
+    [identity.accessToken, projectId],
+  );
 
   if (projectDataState.status !== "ready") {
     return <ProjectPlannerFallbackScreen error={projectDataState.error ?? sessionError} />;
@@ -178,17 +196,22 @@ function ProjectPlannerPageContent({
         plannerCommands={isReady ? plannerNodeEditingCommands : undefined}
         projectId={projectId}
         chatContent={
-          <RealtimeChatPanel
-            currentUserId={identity.id}
-            currentUserName={identity.name}
-            historyStatus={chatHistoryStatus}
-            isReady={isReady}
-            memberInviteContent={
-              <ProjectMemberInviteForm client={restClient} projectId={projectId} />
+          <ProjectChatTabs
+            aiContent={<AiPlannerPanel client={aiPlannerClient} contextItems={aiContextItems} />}
+            teamContent={
+              <RealtimeChatPanel
+                currentUserId={identity.id}
+                currentUserName={identity.name}
+                historyStatus={chatHistoryStatus}
+                isReady={isReady}
+                memberInviteContent={
+                  <ProjectMemberInviteForm client={restClient} projectId={projectId} />
+                }
+                messages={messages}
+                onRetryHistory={() => void loadChatHistory().catch(() => undefined)}
+                onSend={handleSend}
+              />
             }
-            messages={messages}
-            onRetryHistory={() => void loadChatHistory().catch(() => undefined)}
-            onSend={handleSend}
           />
         }
       />
