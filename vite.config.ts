@@ -16,6 +16,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      "/ai": {
+        changeOrigin: true,
+        secure: false,
+        target: "http://127.0.0.1:8787",
+      },
       "/api": {
         changeOrigin: true,
         secure: false,

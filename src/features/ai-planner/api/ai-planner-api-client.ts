@@ -1,11 +1,11 @@
 import type {
   AiPlannerChatClient,
   AiPlannerChatEvent,
-  AiPlannerOperationPreview,
   AiPlannerProposal,
+  AiPlannerProposedOperation,
 } from "@/features/ai-planner/types/ai-planner";
 
-const operationTypes = new Set(["move-activity", "update-activity-memo", "update-activity-time"]);
+const AI_PLANNER_CHAT_PATH = "/ai/v1/planner/chat";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -15,30 +15,37 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
-function isOperation(value: unknown): value is AiPlannerOperationPreview {
-  return (
-    isRecord(value) &&
-    typeof value.after === "string" &&
-    typeof value.before === "string" &&
-    typeof value.id === "string" &&
-    typeof value.label === "string" &&
-    typeof value.pathId === "string" &&
-    typeof value.reason === "string" &&
-    typeof value.type === "string" &&
-    operationTypes.has(value.type)
-  );
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isProposedOperation(value: unknown): value is AiPlannerProposedOperation {
+  if (!isRecord(value) || typeof value.pathId !== "string" || typeof value.reason !== "string") {
+    return false;
+  }
+
+  if (value.type === "move-activity") {
+    return typeof value.destinationParentPathId === "string" && typeof value.position === "number";
+  }
+  if (value.type === "update-activity-memo") {
+    return isNullableString(value.memo);
+  }
+  if (value.type === "update-activity-time") {
+    return isNullableString(value.startTime) && isNullableString(value.endTime);
+  }
+
+  return false;
 }
 
 function isProposal(value: unknown): value is AiPlannerProposal {
   return (
     isRecord(value) &&
-    isStringArray(value.assumptions) &&
-    typeof value.id === "string" &&
-    Array.isArray(value.operations) &&
-    value.operations.every(isOperation) &&
-    (value.status === "draft" || value.status === "rejected") &&
     typeof value.summary === "string" &&
-    isStringArray(value.warnings)
+    isStringArray(value.assumptions) &&
+    isStringArray(value.warnings) &&
+    Array.isArray(value.operations) &&
+    value.operations.length > 0 &&
+    value.operations.every(isProposedOperation)
   );
 }
 
@@ -53,6 +60,9 @@ function parseStreamEvent(value: unknown): AiPlannerChatEvent {
   if (value.type === "error" && typeof value.message === "string") {
     return { type: "error", message: value.message };
   }
+  if (value.type === "proposal-rejected" && typeof value.reason === "string") {
+    return { type: "proposal-rejected", reason: value.reason };
+  }
   if (value.type === "proposal" && isProposal(value.proposal)) {
     return { type: "proposal", proposal: value.proposal };
   }
@@ -61,15 +71,9 @@ function parseStreamEvent(value: unknown): AiPlannerChatEvent {
 
 type CreateAiPlannerApiClientOptions = {
   readonly accessToken: string;
-  readonly apiBaseUrl?: string;
   readonly fetchImplementation?: typeof fetch;
   readonly projectId: string;
 };
-
-function createEndpoint(apiBaseUrl: string | undefined, projectId: string): string {
-  const path = `/api/v2/projects/${encodeURIComponent(projectId)}/ai/chat`;
-  return apiBaseUrl ? `${apiBaseUrl.replace(/\/+$/, "")}${path}` : path;
-}
 
 async function* parseNdjsonStream(
   stream: ReadableStream<Uint8Array>,
@@ -98,16 +102,17 @@ async function* parseNdjsonStream(
   }
 }
 
+// AI Gateway를 같은 origin의 /ai 경로로 직접 호출한다.
+// Gateway는 이 토큰을 ASP.NET에 되물어 세션을 확인하므로 인증 판단은 여전히 백엔드가 소유한다.
 export function createAiPlannerApiClient({
   accessToken,
-  apiBaseUrl,
   fetchImplementation = fetch,
   projectId,
 }: CreateAiPlannerApiClientOptions): AiPlannerChatClient {
   return {
     source: "api",
     async *stream(input, { signal }) {
-      const response = await fetchImplementation(createEndpoint(apiBaseUrl, projectId), {
+      const response = await fetchImplementation(AI_PLANNER_CHAT_PATH, {
         method: "POST",
         headers: {
           Accept: "application/x-ndjson",
@@ -115,7 +120,9 @@ export function createAiPlannerApiClient({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          projectId,
           messages: input.messages,
+          contextItems: input.contextItems,
           selectedPathIds: input.contextItems.map((item) => item.pathId),
         }),
         signal,

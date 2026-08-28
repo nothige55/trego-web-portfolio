@@ -2,12 +2,15 @@ import { z } from "zod";
 
 const pathIdSchema = z.string().trim().min(1).max(200);
 
+// Planner의 형제 순서는 step 0.1 분수라서 정수로 제한하면 안 된다.
+const positionSchema = z.number().finite().nonnegative();
+
 export const aiPlannerContextItemSchema = z.object({
   kind: z.enum(["folder", "day", "activity"]),
   name: z.string().trim().min(1).max(200),
   pathId: pathIdSchema,
   parentPathId: pathIdSchema.nullable(),
-  position: z.number().int().nonnegative(),
+  position: positionSchema,
   memo: z.string().max(4_000).nullable().optional(),
   startTime: z.string().max(50).nullable().optional(),
   endTime: z.string().max(50).nullable().optional(),
@@ -21,7 +24,6 @@ export const aiPlannerChatMessageSchema = z.object({
 export const aiPlannerChatRequestSchema = z
   .object({
     projectId: z.string().trim().min(1).max(100),
-    memberId: z.string().trim().min(1).max(100),
     messages: z.array(aiPlannerChatMessageSchema).min(1).max(30),
     contextItems: z.array(aiPlannerContextItemSchema).max(100),
     selectedPathIds: z.array(pathIdSchema).max(100),
@@ -41,12 +43,14 @@ export const aiPlannerChatRequestSchema = z
 
 const operationReasonSchema = z.string().trim().min(1).max(500);
 
+// 모델이 만들 수 있는 변경은 도메인 명령 하나로 번역 가능한 형태로만 제한한다.
+// 표현용 라벨과 diff 문구는 여기 두지 않는다. 클라이언트가 자기 문맥에서 만든다.
 export const plannerOperationProposalSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("move-activity"),
     pathId: pathIdSchema,
     destinationParentPathId: pathIdSchema,
-    position: z.number().int().nonnegative(),
+    position: positionSchema,
     reason: operationReasonSchema,
   }),
   z.object({
@@ -76,6 +80,7 @@ export const plannerProposalSchema = z.object({
 });
 
 export type AiPlannerChatRequest = z.infer<typeof aiPlannerChatRequestSchema>;
+export type AiPlannerContextItem = z.infer<typeof aiPlannerContextItemSchema>;
 export type PlannerProposal = z.infer<typeof plannerProposalSchema>;
 
 export type AiPlannerStreamEvent =

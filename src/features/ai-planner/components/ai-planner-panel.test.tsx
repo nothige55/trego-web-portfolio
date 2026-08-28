@@ -3,6 +3,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AiPlannerPanel } from "@/features/ai-planner/components/ai-planner-panel";
 import { render, screen, userEvent, within } from "@/testing/test-utils";
 
+const seongsan = {
+  kind: "activity",
+  name: "성산일출봉",
+  pathId: "activity-seongsan",
+  memo: "일출 보기",
+  startTime: "07:00",
+  endTime: "08:30",
+} as const;
+
+async function sendPrompt(user: ReturnType<typeof userEvent.setup>, prompt: string) {
+  await user.type(screen.getByRole("textbox", { name: "AI 플래너에게 메시지" }), prompt);
+  await user.click(screen.getByRole("button", { name: "AI 플래너에게 보내기" }));
+  return screen.findByRole("region", { name: "AI 일정 변경 제안" });
+}
+
 describe("AiPlannerPanel", () => {
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -13,20 +28,7 @@ describe("AiPlannerPanel", () => {
 
   it("captures the selected Activity as context and returns a reviewable mock proposal", async () => {
     const user = userEvent.setup();
-    const { rerender } = render(
-      <AiPlannerPanel
-        contextItems={[
-          {
-            kind: "activity",
-            name: "성산일출봉",
-            pathId: "activity-seongsan",
-            memo: "일출 보기",
-            startTime: "07:00",
-            endTime: "08:30",
-          },
-        ]}
-      />,
-    );
+    const { rerender } = render(<AiPlannerPanel contextItems={[seongsan]} />);
 
     expect(screen.getByLabelText("AI가 참고할 일정")).toHaveTextContent("성산일출봉");
 
@@ -38,14 +40,16 @@ describe("AiPlannerPanel", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("문맥을 분석");
     const proposal = await screen.findByRole("region", { name: "AI 일정 변경 제안" });
-    expect(within(proposal).getByText("성산일출봉 메모 보완")).toBeInTheDocument();
-    expect(within(proposal).getByText("성산일출봉 시간 조정")).toBeInTheDocument();
-    expect(proposal).toHaveTextContent("일출 보기 →");
-    expect(proposal).toHaveTextContent("07:00–08:30 →");
+    expect(within(proposal).getByText("성산일출봉 메모")).toBeInTheDocument();
+    expect(within(proposal).getByText("성산일출봉 시간")).toBeInTheDocument();
     expect(within(proposal).getByRole("button", { name: "선택한 변경 적용" })).toBeDisabled();
 
     await user.click(within(proposal).getByRole("button", { name: "변경 전후 미리보기" }));
     expect(within(proposal).getByRole("status")).toHaveTextContent("적용 전 diff · 2건");
+    // before는 스냅샷이 아니라 현재 문맥 값에서 만들어진다.
+    expect(proposal).toHaveTextContent("일출 보기");
+    expect(proposal).toHaveTextContent("07:00–08:30");
+    expect(proposal).toHaveTextContent("14:00–15:30");
     expect(
       within(proposal).getByText("아직 Planner와 서버에는 반영되지 않았습니다."),
     ).toBeVisible();
@@ -65,6 +69,41 @@ describe("AiPlannerPanel", () => {
       "이 변경안은 적용 대상에서 제외되었습니다.",
     );
     expect(within(proposal).queryByRole("button", { name: "선택한 변경 적용" })).toBeNull();
+  });
+
+  it("runs approved operations through the injected Planner executor", async () => {
+    const user = userEvent.setup();
+    const approve = vi.fn().mockResolvedValue(undefined);
+    render(<AiPlannerPanel contextItems={[seongsan]} onApproveOperations={approve} />);
+
+    const proposal = await sendPrompt(user, "메모를 정리해줘");
+    await user.click(within(proposal).getByRole("button", { name: "선택한 변경 적용" }));
+
+    expect(approve).toHaveBeenCalledTimes(1);
+    expect(approve.mock.calls[0]?.[0]).toEqual([
+      expect.objectContaining({
+        type: "update-activity-memo",
+        pathId: "activity-seongsan",
+      }),
+    ]);
+    expect(await within(proposal).findByRole("status")).toHaveTextContent("변경을 적용했습니다");
+    expect(within(proposal).queryByRole("button", { name: "선택한 변경 적용" })).toBeNull();
+  });
+
+  it("keeps the proposal retryable when applying the change fails", async () => {
+    const user = userEvent.setup();
+    const approve = vi.fn().mockRejectedValue(new Error("실시간 연결이 끊겼습니다."));
+    render(<AiPlannerPanel contextItems={[seongsan]} onApproveOperations={approve} />);
+
+    const proposal = await sendPrompt(user, "메모를 정리해줘");
+    await user.click(within(proposal).getByRole("button", { name: "선택한 변경 적용" }));
+
+    expect(await within(proposal).findByRole("alert")).toHaveTextContent(
+      "실시간 연결이 끊겼습니다.",
+    );
+
+    await user.click(within(proposal).getByRole("button", { name: "다시 시도" }));
+    expect(within(proposal).getByRole("button", { name: "선택한 변경 적용" })).toBeEnabled();
   });
 
   it("answers without a change proposal when no Activity is selected", async () => {

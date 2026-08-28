@@ -8,6 +8,7 @@ import {
   ProjectRealtimeStatusBanner,
 } from "@/app/realtime/project-realtime-provider";
 import { useAiPlannerContext } from "@/app/realtime/use-ai-planner-context";
+import { useAiPlannerExecution } from "@/app/realtime/use-ai-planner-execution";
 import {
   type ProjectDataState,
   useProjectDataLoader,
@@ -17,6 +18,7 @@ import { env } from "@/config/env";
 import { createAiPlannerApiClient } from "@/features/ai-planner/api/ai-planner-api-client";
 import { mockAiPlannerClient } from "@/features/ai-planner/api/mock-ai-planner-client";
 import { AiPlannerPanel } from "@/features/ai-planner/components/ai-planner-panel";
+import type { AiPlannerOperationExecutor } from "@/features/ai-planner/types/ai-planner";
 import type { AuthSession } from "@/features/auth/types";
 import {
   type ChatMessage,
@@ -92,6 +94,7 @@ export function ProjectPlannerPage({
     () => createPlannerEditingCommands({ replayHistory, runRecordedOperation }),
     [replayHistory, runRecordedOperation],
   );
+  const approveAiOperations = useAiPlannerExecution(runRecordedOperation);
 
   return (
     <ProjectRealtimeProvider
@@ -103,6 +106,7 @@ export function ProjectPlannerPage({
       resync={resync}
     >
       <ProjectPlannerPageContent
+        approveAiOperations={approveAiOperations}
         featureError={featureError}
         chatHistoryStatus={chatHistoryStatus}
         identity={identity}
@@ -120,6 +124,7 @@ export function ProjectPlannerPage({
 }
 
 type ProjectPlannerPageContentProps = {
+  readonly approveAiOperations: AiPlannerOperationExecutor;
   readonly chatHistoryStatus: "error" | "loading" | "ready";
   readonly featureError: Error | null;
   readonly identity: AuthSession;
@@ -137,6 +142,7 @@ type ProjectPlannerPageContentProps = {
 };
 
 function ProjectPlannerPageContent({
+  approveAiOperations,
   chatHistoryStatus,
   featureError,
   identity,
@@ -166,7 +172,6 @@ function ProjectPlannerPageContent({
       env.aiPlannerMode === "api"
         ? createAiPlannerApiClient({
             accessToken: identity.accessToken,
-            apiBaseUrl: env.apiBaseUrl,
             projectId,
           })
         : mockAiPlannerClient,
@@ -197,7 +202,13 @@ function ProjectPlannerPageContent({
         projectId={projectId}
         chatContent={
           <ProjectChatTabs
-            aiContent={<AiPlannerPanel client={aiPlannerClient} contextItems={aiContextItems} />}
+            aiContent={
+              <AiPlannerPanel
+                client={aiPlannerClient}
+                contextItems={aiContextItems}
+                onApproveOperations={isReady ? approveAiOperations : undefined}
+              />
+            }
             teamContent={
               <RealtimeChatPanel
                 currentUserId={identity.id}

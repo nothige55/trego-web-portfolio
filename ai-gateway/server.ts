@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
 
@@ -6,43 +5,32 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 import { aiPlannerChatRequestSchema, type AiPlannerStreamEvent } from "./contracts.js";
 import { streamPlannerResponse } from "./planner-agent.js";
+import { createRateLimiter, type RateLimiter } from "./rate-limit.js";
+import { verifyMember } from "./verify-member.js";
 
 const MAX_REQUEST_BYTES = 1_000_000;
+const RATE_LIMIT_PER_WINDOW = 20;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 type GatewayConfig = {
+  readonly apiBaseUrl: string;
   readonly apiKey?: string;
   readonly model: string;
   readonly port: number;
-  readonly sharedSecret: string;
 };
 
 function getConfig(): GatewayConfig {
-  const sharedSecret = process.env.AI_GATEWAY_SHARED_SECRET?.trim();
-  if (!sharedSecret) throw new Error("AI_GATEWAY_SHARED_SECRET is required.");
-
   const port = Number(process.env.AI_GATEWAY_PORT ?? 8787);
   if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
     throw new Error("AI_GATEWAY_PORT must be a valid TCP port.");
   }
 
   return {
+    apiBaseUrl: process.env.TREGO_API_BASE_URL?.trim() || "http://localhost:3000",
     apiKey: process.env.OPENAI_API_KEY?.trim() || undefined,
     model: process.env.OPENAI_MODEL?.trim() || "gpt-5.6-terra",
     port,
-    sharedSecret,
   };
-}
-
-function isAuthorized(request: IncomingMessage, sharedSecret: string): boolean {
-  const authorization = request.headers.authorization;
-  if (!authorization?.startsWith("Bearer ")) return false;
-
-  const providedSecret = Buffer.from(authorization.slice("Bearer ".length));
-  const expectedSecret = Buffer.from(sharedSecret);
-  return (
-    providedSecret.length === expectedSecret.length &&
-    timingSafeEqual(providedSecret, expectedSecret)
-  );
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
@@ -72,14 +60,35 @@ async function handlePlannerChat(
   request: IncomingMessage,
   response: ServerResponse,
   config: GatewayConfig,
+  rateLimiter: RateLimiter,
 ): Promise<void> {
-  if (!isAuthorized(request, config.sharedSecret)) {
+  const authorization = request.headers.authorization;
+  if (!authorization?.startsWith("Bearer ")) {
     sendJson(response, 401, { error: "Unauthorized" });
     return;
   }
 
   if (!config.apiKey) {
     sendJson(response, 503, { error: "OPENAI_API_KEY is not configured." });
+    return;
+  }
+
+  let memberId: string;
+  try {
+    const verification = await verifyMember({ apiBaseUrl: config.apiBaseUrl, authorization });
+    if (verification.status === "unauthorized") {
+      sendJson(response, 401, { error: "Unauthorized" });
+      return;
+    }
+    memberId = verification.memberId;
+  } catch (error) {
+    console.error("Member verification failed", error);
+    sendJson(response, 502, { error: "Unable to verify the session." });
+    return;
+  }
+
+  if (!rateLimiter.consume(memberId, Date.now())) {
+    sendJson(response, 429, { error: "너무 많은 요청입니다. 잠시 후 다시 시도해 주세요." });
     return;
   }
 
@@ -129,8 +138,13 @@ async function handlePlannerChat(
 }
 
 export function createGatewayServer(config: GatewayConfig) {
+  const rateLimiter = createRateLimiter({
+    limit: RATE_LIMIT_PER_WINDOW,
+    windowMs: RATE_LIMIT_WINDOW_MS,
+  });
+
   return createServer((request, response) => {
-    if (request.method === "GET" && request.url === "/health") {
+    if (request.method === "GET" && request.url === "/ai/health") {
       sendJson(response, 200, {
         model: config.model,
         openAiConfigured: Boolean(config.apiKey),
@@ -139,8 +153,8 @@ export function createGatewayServer(config: GatewayConfig) {
       return;
     }
 
-    if (request.method === "POST" && request.url === "/v1/planner/chat") {
-      void handlePlannerChat(request, response, config);
+    if (request.method === "POST" && request.url === "/ai/v1/planner/chat") {
+      void handlePlannerChat(request, response, config, rateLimiter);
       return;
     }
 

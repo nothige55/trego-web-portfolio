@@ -8,13 +8,17 @@ import type {
   AiPlannerChatClient,
   AiPlannerContextItem,
   AiPlannerMessage,
-  AiPlannerProposal,
+  AiPlannerOperationExecutor,
+  AiPlannerOperationPreview,
+  AiPlannerProposalPreview,
   AiPlannerProposalToolPart,
 } from "@/features/ai-planner/types/ai-planner";
+import { createProposalPreview } from "@/features/ai-planner/utils/create-proposal-preview";
 
 type AiPlannerPanelProps = {
   readonly client?: AiPlannerChatClient;
   readonly contextItems: readonly AiPlannerContextItem[];
+  readonly onApproveOperations?: AiPlannerOperationExecutor;
 };
 
 const welcomeMessage: AiPlannerMessage = {
@@ -29,6 +33,12 @@ const welcomeMessage: AiPlannerMessage = {
   ],
 };
 
+// input-streaming 단계에서는 제안이 아직 부분 객체라 화면과 상태 전이 대상이 아니다.
+function readProposalInput(part: AiPlannerProposalToolPart): AiPlannerProposalPreview | null {
+  if (part.state === "input-streaming") return null;
+  return part.input ?? null;
+}
+
 function getMessageText(message: AiPlannerMessage): string {
   return message.parts
     .filter((part) => part.type === "text")
@@ -39,6 +49,7 @@ function getMessageText(message: AiPlannerMessage): string {
 export function AiPlannerPanel({
   client = mockAiPlannerClient,
   contextItems,
+  onApproveOperations,
 }: AiPlannerPanelProps) {
   const [messages, setMessages] = useState<readonly AiPlannerMessage[]>([welcomeMessage]);
   const [draft, setDraft] = useState("");
@@ -61,33 +72,91 @@ export function AiPlannerPanel({
     setDraft("");
   }
 
-  function rejectProposal(toolCallId: string) {
+  function updateProposalPart(
+    toolCallId: string,
+    createNextPart: (input: AiPlannerProposalPreview) => AiPlannerProposalToolPart,
+  ) {
     setMessages((current) =>
       current.map((message) => ({
         ...message,
         parts: message.parts.map((part) => {
-          if (
-            part.type !== "tool-proposePlannerOperations" ||
-            part.toolCallId !== toolCallId ||
-            (part.state !== "approval-requested" && part.state !== "input-available")
-          ) {
+          if (part.type !== "tool-proposePlannerOperations" || part.toolCallId !== toolCallId) {
             return part;
           }
-
-          return {
-            type: "tool-proposePlannerOperations",
-            toolCallId: part.toolCallId,
-            state: "output-denied",
-            input: part.input,
-            approval: {
-              id: `approval-${part.toolCallId}`,
-              approved: false,
-              reason: "사용자가 변경안을 거절했습니다.",
-            },
-          } satisfies AiPlannerProposalToolPart;
+          const input = readProposalInput(part);
+          return input ? createNextPart(input) : part;
         }),
       })),
     );
+  }
+
+  function rejectProposal(toolCallId: string) {
+    updateProposalPart(toolCallId, (input) => ({
+      type: "tool-proposePlannerOperations",
+      toolCallId,
+      state: "output-denied",
+      input,
+      approval: {
+        id: `approval-${toolCallId}`,
+        approved: false,
+        reason: "사용자가 변경안을 거절했습니다.",
+      },
+    }));
+  }
+
+  function retryProposal(toolCallId: string) {
+    updateProposalPart(toolCallId, (input) => ({
+      type: "tool-proposePlannerOperations",
+      toolCallId,
+      state: "approval-requested",
+      input,
+      approval: { id: `approval-${toolCallId}` },
+    }));
+  }
+
+  // 승인된 변경은 수동 편집과 같은 Planner 명령 경로로 실행된다.
+  // 확정 결과는 응답 스트림이 아니라 SignalR 이벤트로 돌아온다.
+  async function approveProposal(
+    toolCallId: string,
+    operations: readonly AiPlannerOperationPreview[],
+  ) {
+    if (!onApproveOperations || operations.length === 0) return;
+
+    const approval = { id: `approval-${toolCallId}`, approved: true } as const;
+    updateProposalPart(toolCallId, (input) => ({
+      type: "tool-proposePlannerOperations",
+      toolCallId,
+      state: "approval-responded",
+      input,
+      approval,
+    }));
+
+    try {
+      await onApproveOperations(operations.map((operation) => operation.operation));
+      updateProposalPart(toolCallId, (input) => ({
+        type: "tool-proposePlannerOperations",
+        toolCallId,
+        state: "output-available",
+        input,
+        output: {
+          status: "applied",
+          appliedOperationIds: operations.map((operation) => operation.id),
+        },
+        approval,
+      }));
+    } catch (error) {
+      updateProposalPart(toolCallId, (input) => ({
+        type: "tool-proposePlannerOperations",
+        toolCallId,
+        state: "output-error",
+        input,
+        errorText:
+          error instanceof Error
+            ? error.message
+            : "변경을 적용하지 못했습니다. 다시 시도해 주세요.",
+        approval,
+      }));
+    }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -114,7 +183,7 @@ export function AiPlannerPanel({
     setIsGenerating(true);
     responseAbortRef.current = abortController;
 
-    function updateAssistantMessage(content: string, proposal?: AiPlannerProposal) {
+    function updateAssistantMessage(content: string, proposal?: AiPlannerProposalPreview) {
       setMessages((current) => {
         const currentAssistant = current.find((message) => message.id === assistantMessageId);
         const currentProposalPart = currentAssistant?.parts.find(
@@ -171,7 +240,17 @@ export function AiPlannerPanel({
             responseText += event.text;
             updateAssistantMessage(responseText);
           } else if (event.type === "proposal") {
-            updateAssistantMessage(responseText, event.proposal);
+            updateAssistantMessage(
+              responseText,
+              createProposalPreview(
+                event.proposal,
+                contextSnapshot,
+                globalThis.crypto.randomUUID(),
+              ),
+            );
+          } else if (event.type === "proposal-rejected") {
+            responseText = `${responseText}\n${event.reason}`.trim();
+            updateAssistantMessage(responseText);
           } else if (event.type === "error") {
             updateAssistantMessage(event.message);
           }
@@ -277,16 +356,19 @@ export function AiPlannerPanel({
                   );
                 }
 
-                if (
-                  part.type === "tool-proposePlannerOperations" &&
-                  part.state !== "input-streaming" &&
-                  part.input
-                ) {
+                if (part.type === "tool-proposePlannerOperations") {
+                  const proposal = readProposalInput(part);
+                  if (!proposal) return null;
+
                   return (
                     <AiPlannerProposalCard
                       key={part.toolCallId}
+                      canApprove={Boolean(onApproveOperations)}
+                      errorText={part.state === "output-error" ? part.errorText : null}
+                      onApprove={(operations) => void approveProposal(part.toolCallId, operations)}
                       onReject={() => rejectProposal(part.toolCallId)}
-                      proposal={part.input}
+                      onRetry={() => retryProposal(part.toolCallId)}
+                      proposal={proposal}
                       toolState={part.state}
                     />
                   );

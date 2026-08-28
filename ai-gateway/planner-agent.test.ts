@@ -7,7 +7,6 @@ import { streamPlannerResponse } from "./planner-agent.js";
 
 const request: AiPlannerChatRequest = {
   projectId: "project-1",
-  memberId: "member-1",
   messages: [{ role: "user", content: "오후로 옮겨줘" }],
   selectedPathIds: ["activity-1"],
   contextItems: [

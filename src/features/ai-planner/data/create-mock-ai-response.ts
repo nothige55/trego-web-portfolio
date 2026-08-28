@@ -1,47 +1,34 @@
 import type {
   AiPlannerContextItem,
   AiPlannerGeneratedResponse,
-  AiPlannerOperationPreview,
   AiPlannerProposal,
+  AiPlannerProposedOperation,
 } from "@/features/ai-planner/types/ai-planner";
 
-function createId(): string {
-  return globalThis.crypto.randomUUID();
-}
-
 function createActivityProposal(activity: AiPlannerContextItem, prompt: string): AiPlannerProposal {
-  const currentMemo = activity.memo?.trim() || "메모 없음";
-  const operations: AiPlannerOperationPreview[] = [
+  const operations: AiPlannerProposedOperation[] = [
     {
-      id: createId(),
       type: "update-activity-memo",
       pathId: activity.pathId,
-      label: `${activity.name} 메모 보완`,
-      before: currentMemo,
-      after: `${prompt} 요청을 확인할 메모 추가`,
+      memo: `${prompt} 요청을 확인할 메모 추가`,
       reason: "요청의 의도를 일정에서 다시 확인할 수 있도록 남깁니다.",
     },
   ];
 
   if (/(시간|오전|오후|늦|일찍)/.test(prompt)) {
-    const currentTime = [activity.startTime, activity.endTime].filter(Boolean).join("–");
     operations.push({
-      id: createId(),
       type: "update-activity-time",
       pathId: activity.pathId,
-      label: `${activity.name} 시간 조정`,
-      before: currentTime || "시간 미정",
-      after: "요청에 맞춘 추천 시간",
+      startTime: "14:00",
+      endTime: "15:30",
       reason: "선택한 일정의 시간대 요청을 반영합니다.",
     });
   }
 
   return {
-    id: createId(),
-    status: "draft",
     summary: `${activity.name} 일정에 ${operations.length}개의 변경을 제안합니다.`,
     assumptions: ["현재 선택한 Activity만 변경 대상으로 해석했습니다."],
-    warnings: ["이 변경안은 Mock이며 아직 서버에 적용되지 않습니다."],
+    warnings: ["이 변경안은 Mock 응답이며 실제 모델이 만든 것이 아닙니다."],
     operations,
   };
 }

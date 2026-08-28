@@ -26,19 +26,15 @@ describe("createAiPlannerApiClient", () => {
         type: "proposal",
         proposal: {
           assumptions: [],
-          id: "proposal-1",
           operations: [
             {
-              after: "14:00",
-              before: "10:00",
-              id: "operation-1",
-              label: "아사쿠사 시간 조정",
-              pathId: "activity-1",
-              reason: "오후 요청 반영",
               type: "update-activity-time",
+              pathId: "activity-1",
+              startTime: "14:00",
+              endTime: "15:30",
+              reason: "오후 요청 반영",
             },
           ],
-          status: "draft",
           summary: "오후로 시간을 조정합니다.",
           warnings: [],
         },
@@ -49,9 +45,8 @@ describe("createAiPlannerApiClient", () => {
     fetchImplementation.mockResolvedValue(createNdjsonResponse(events));
     const client = createAiPlannerApiClient({
       accessToken: "access-token",
-      apiBaseUrl: "https://api.example.com/",
       fetchImplementation,
-      projectId: "project/1",
+      projectId: "project-1",
     });
     const receivedEvents = [];
 
@@ -67,7 +62,7 @@ describe("createAiPlannerApiClient", () => {
 
     expect(receivedEvents).toEqual(events);
     expect(fetchImplementation).toHaveBeenCalledWith(
-      "https://api.example.com/api/v2/projects/project%2F1/ai/chat",
+      "/ai/v1/planner/chat",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({ Authorization: "Bearer access-token" }),
@@ -75,9 +70,34 @@ describe("createAiPlannerApiClient", () => {
     );
     const request = fetchImplementation.mock.calls[0]?.[1];
     expect(JSON.parse(String(request?.body))).toEqual({
+      projectId: "project-1",
       messages: [{ role: "user", content: "오후로 늦춰줘" }],
+      contextItems: [{ kind: "activity", name: "아사쿠사", pathId: "activity-1" }],
       selectedPathIds: ["activity-1"],
     });
+  });
+
+  it("surfaces a rejected proposal instead of failing the stream", async () => {
+    const events = [
+      { type: "text-delta", text: "확인했습니다." },
+      { type: "proposal-rejected", reason: "현재 문맥에 없는 Activity가 포함되었습니다." },
+      { type: "finish" },
+    ] as const;
+    const client = createAiPlannerApiClient({
+      accessToken: "access-token",
+      fetchImplementation: vi.fn<typeof fetch>().mockResolvedValue(createNdjsonResponse(events)),
+      projectId: "project-1",
+    });
+    const receivedEvents = [];
+
+    for await (const event of client.stream(
+      { contextItems: [], messages: [{ role: "user", content: "옮겨줘" }] },
+      { signal: new AbortController().signal },
+    )) {
+      receivedEvents.push(event);
+    }
+
+    expect(receivedEvents).toEqual(events);
   });
 
   it("reports a failed API response before reading the stream", async () => {
