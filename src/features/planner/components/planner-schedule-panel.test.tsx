@@ -71,8 +71,11 @@ describe("PlannerSchedulePanel", () => {
     await user.click(within(tree).getByRole("button", { name: "가보고 싶은 곳" }));
     const selectedRow = within(tree).getByText("가보고 싶은 곳").closest("[role=treeitem]");
 
+    const rowOf = (item: Element | null | undefined) =>
+      item?.querySelector('[data-slot="context-menu-trigger"]');
+
     expect(selectedRow).toHaveAttribute("aria-selected", "true");
-    expect(selectedRow?.firstElementChild).toHaveClass("bg-brand/10");
+    expect(rowOf(selectedRow)).toHaveClass("bg-brand/10");
 
     dndState.activePathId =
       [...usePlannerViewStore.getState().tree.entityMap.values()].find(
@@ -82,7 +85,7 @@ describe("PlannerSchedulePanel", () => {
 
     expect(selectedRow).toHaveAttribute("aria-selected", "true");
     expect(selectedRow).toHaveAttribute("data-selection-state", "selected");
-    expect(selectedRow?.firstElementChild).not.toHaveClass("bg-brand/10");
+    expect(rowOf(selectedRow)).not.toHaveClass("bg-brand/10");
   });
 
   it("forwards accepted moves only while realtime writes are enabled", () => {
@@ -335,8 +338,74 @@ describe("PlannerSchedulePanel", () => {
     expect(airportItem).not.toHaveAttribute("data-map-highlight");
 
     expect(screen.getByTestId("planner-route-day-one-iho")).toHaveTextContent(
-      "3.9km자동차 15분길찾기",
+      "3.9km·자동차 15분길찾기",
     );
+  });
+
+  // 경로 정보는 두 노드 사이의 것이라 드래그 단위 안에 들어가면 rect와 충돌 판정이 어긋난다.
+  it("keeps route info outside the draggable node", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(<PlannerWorkspace isNodeMoveEnabled onMoveNode={vi.fn()} projectId="demo" />);
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+    const ihoItem = within(tree).getByText("이호테우해변").closest("[role=treeitem]");
+    const routeInfo = screen.getByTestId("planner-route-day-one-iho");
+    const nodeBox = ihoItem?.querySelector("[data-planner-node]");
+
+    // 노드와 함께 움직이도록 같은 treeitem 안에 있되, 잡는 단위 밖에 놓인다.
+    expect(ihoItem?.contains(routeInfo)).toBe(true);
+    expect(nodeBox?.contains(routeInfo)).toBe(false);
+    expect(routeInfo.closest("[data-planner-route-slot]")?.nextElementSibling).toBe(nodeBox);
+  });
+
+  it("hides only the route info that the dragged node sits between", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    const onMoveNode = vi.fn();
+    const { rerender } = render(
+      <PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />,
+    );
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+    const slotOf = (pathId: string) =>
+      screen.getByTestId(`planner-route-${pathId}`).closest("[data-planner-route-slot]");
+
+    dndState.activePathId = "day-one-iho";
+    rerender(<PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />);
+
+    // 잡은 노드로 들어오는 구간과 나가는 구간만 값이 무의미해진다.
+    expect(slotOf("day-one-iho")).toHaveStyle({ visibility: "hidden" });
+    expect(slotOf("day-one-aewol")).toHaveStyle({ visibility: "hidden" });
+    // 떨어져 있는 구간은 그대로 보인다.
+    expect(slotOf("day-one-hyeopjae")).not.toHaveStyle({ visibility: "hidden" });
+  });
+
+  it("extends the selection highlight from the label to its memo", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(<PlannerWorkspace isNodeMoveEnabled onMoveNode={vi.fn()} projectId="demo" />);
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+    const memo = within(tree).getByText("카페에서 잠시 쉬기");
+    expect(memo.closest("[class*='border-l-2']")).not.toHaveClass("bg-brand/5");
+
+    await user.click(within(tree).getByText("애월 해안도로"));
+
+    expect(within(tree).getByText("애월 해안도로").closest("[role=treeitem]")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(memo.closest("[class*='border-l-2']")).toHaveClass("bg-brand/5");
   });
 
   it("keeps Activity names read-only and edits only their memo", async () => {

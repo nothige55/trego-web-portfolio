@@ -39,12 +39,3 @@ export function formatPlannerDistance(distanceKm: number): string {
     ? `${Math.max(1, Math.round(distanceKm * 1000))}m`
     : `${distanceKm < 10 ? distanceKm.toFixed(1) : Math.round(distanceKm)}km`;
 }
-
-// 좌표가 없으면 거리를 낼 수 없어 경로 정보를 아예 그리지 않는다.
-// 행과 드래그 미리보기가 같은 판정을 써야 미리보기 시작 위치가 어긋나지 않는다.
-export function hasPlannerRouteInfo(
-  activity: PlannerActivityNode,
-  previousActivity: PlannerActivityNode,
-): boolean {
-  return calculatePlannerDistanceKm(previousActivity, activity) !== null;
-}

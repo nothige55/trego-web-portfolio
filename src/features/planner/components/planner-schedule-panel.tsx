@@ -5,11 +5,12 @@ import {
   DragOverlay,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { SortableContext } from "@dnd-kit/sortable";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { PlannerBreadcrumb } from "@/features/planner/components/planner-breadcrumb";
 import { PlannerDragPreview } from "@/features/planner/components/planner-drag-preview";
+import { PlannerRouteInfo } from "@/features/planner/components/planner-route-info";
 import { PlannerScheduleHeader } from "@/features/planner/components/planner-schedule-header";
 import { PlannerScheduleToolbar } from "@/features/planner/components/planner-schedule-toolbar";
 import { PlannerTreeItem } from "@/features/planner/components/planner-tree-item";
@@ -28,6 +29,7 @@ import type { PlannerNodePathId } from "@/features/planner/types/planner-node";
 import { buildPlannerDayNumbers } from "@/features/planner/utils/build-planner-day-numbers";
 import { getPlannerBreadcrumbAncestors } from "@/features/planner/utils/get-planner-breadcrumb-ancestors";
 import { getPlannerRowAdornments } from "@/features/planner/utils/get-planner-row-adornments";
+import { getPlannerRowIndentation } from "@/features/planner/utils/get-planner-row-indentation";
 import { getVisiblePlannerNodes } from "@/features/planner/utils/get-visible-planner-nodes";
 
 // 이 파일은 일정 트리의 조합만 담당한다.
@@ -51,11 +53,20 @@ export function PlannerSchedulePanel({
   const expandedIds = usePlannerViewStore((state) => state.expandedIds);
   const clearSelection = usePlannerViewStore((state) => state.clearSelection);
   const expandNode = usePlannerViewStore((state) => state.expandNode);
-  const itemRefs = useRef(new Map<PlannerNodePathId, HTMLLIElement>());
+  const itemRefs = useRef(new Map<PlannerNodePathId, HTMLDivElement>());
   const getItemElement = useCallback(
-    (pathId: PlannerNodePathId): HTMLLIElement | null => itemRefs.current.get(pathId) ?? null,
+    (pathId: PlannerNodePathId): HTMLDivElement | null => itemRefs.current.get(pathId) ?? null,
     [],
   );
+  // 노드가 떠나면 그 앞머리인 경로 정보도 함께 닫히므로 자리는 li 기준으로 잰다.
+  const getItemBlockHeight = useCallback((pathId: PlannerNodePathId): number => {
+    const element = itemRefs.current.get(pathId);
+    if (!element) {
+      return 0;
+    }
+
+    return element.parentElement?.offsetHeight ?? element.offsetHeight;
+  }, []);
   const [dragFootprintHeight, setDragFootprintHeight] = useState(0);
   const nameEditing = usePlannerNameEditing(commands);
   const memoEditing = usePlannerMemoEditing(commands);
@@ -115,11 +126,7 @@ export function PlannerSchedulePanel({
   const handlePanelDragStart = (event: DragStartEvent): void => {
     const pathId = String(event.active.id);
     setDragFootprintHeight(
-      calculatePlannerDragFootprintHeight(
-        renderedItems,
-        pathId,
-        (itemPathId) => getItemElement(itemPathId)?.offsetHeight ?? 0,
-      ),
+      calculatePlannerDragFootprintHeight(renderedItems, pathId, getItemBlockHeight),
     );
     handleDragStart(event);
   };
@@ -132,16 +139,6 @@ export function PlannerSchedulePanel({
     handleDragCancel();
   };
   const activeNode = activePathId ? tree.entityMap.get(activePathId) : undefined;
-  // 미리보기도 행과 같은 기준으로 경로 정보 유무를 판단해야 시작 위치가 어긋나지 않는다.
-  const activeRowAdornments = activeNode
-    ? getPlannerRowAdornments({
-        node: activeNode,
-        tree,
-        rootPathId,
-        topItemId,
-        isDragging: true,
-      })
-    : undefined;
   const breadcrumbAncestors = useMemo(
     () => getPlannerBreadcrumbAncestors(topItemId, rootPathId, tree.entityMap),
     [rootPathId, topItemId, tree.entityMap],
@@ -196,7 +193,14 @@ export function PlannerSchedulePanel({
             onDragMove={handleDragMove}
             onDragStart={handlePanelDragStart}
           >
-            <SortableContext items={sortableItems.map((node) => node.pathId)}>
+            {/* 기본값인 rect 전략은 rect 배열을 arrayMove한 뒤 "네 자리를 차지할 행의 원래
+                위치로 가라"로 이동량을 낸다. 행 높이가 고를 때만 맞는 계산이라 메모가 달린
+                행이 섞이면 이동량도 scaleY도 행마다 어긋난다. 세로 목록 전략은 두 index
+                사이의 행에 잡은 행의 실제 높이 + 실제 간격(= 사이에 낀 경로 정보)을 준다. */}
+            <SortableContext
+              items={sortableItems.map((node) => node.pathId)}
+              strategy={verticalListSortingStrategy}
+            >
               <ul
                 role="tree"
                 aria-label="여행 일정"
@@ -233,9 +237,30 @@ export function PlannerSchedulePanel({
                     <PlannerTreeItem
                       key={node.pathId}
                       node={node}
+                      routeInfo={
+                        node.kind === "activity" && previousActivity ? (
+                          // 잡고 있는 노드가 한쪽 끝인 구간만 값이 무의미해지므로
+                          // 그 둘만 자리를 남기고 숨긴다.
+                          <div
+                            data-planner-route-slot=""
+                            style={{
+                              visibility:
+                                node.pathId === activePathId ||
+                                previousActivity.pathId === activePathId
+                                  ? "hidden"
+                                  : undefined,
+                            }}
+                          >
+                            <PlannerRouteInfo
+                              activity={node}
+                              previousActivity={previousActivity}
+                              indentation={getPlannerRowIndentation(node.depth)}
+                            />
+                          </div>
+                        ) : null
+                      }
                       dayNumber={dayNumberByPathId.get(node.pathId)}
                       boundaryAncestor={boundaryAncestor}
-                      previousActivity={previousActivity}
                       isChildTarget={childTargetPathId === node.pathId}
                       isExpandingTarget={expandingTargetPathId === node.pathId}
                       isSiblingDropActive={isSiblingDropActive}
@@ -261,7 +286,6 @@ export function PlannerSchedulePanel({
                 <PlannerDragPreview
                   node={activeNode}
                   dayNumber={dayNumberByPathId.get(activeNode.pathId)}
-                  previousActivity={activeRowAdornments?.previousActivity}
                 />
               </DragOverlay>
             ) : null}

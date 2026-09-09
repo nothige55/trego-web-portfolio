@@ -1,11 +1,11 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { DayMapVisibilityToggle } from "@/features/planner/components/day-map-visibility-toggle";
 import { PlannerActivityMemo } from "@/features/planner/components/planner-activity-memo";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
-import { PlannerRouteInfo } from "@/features/planner/components/planner-route-info";
 import { PlannerTreeItemContextMenu } from "@/features/planner/components/planner-tree-item-context-menu";
 import { PlannerTreeItemNameInput } from "@/features/planner/components/planner-tree-item-name-input";
 import type { PlannerMemoEditing } from "@/features/planner/hooks/use-planner-memo-editing";
@@ -14,9 +14,9 @@ import { usePlannerViewStore } from "@/features/planner/stores/planner-view-stor
 import type { PlannerNodeEditingCommands } from "@/features/planner/types/planner-editing-commands";
 import type {
   FlattenedPlannerNode,
-  PlannerActivityNode,
   PlannerNodePathId,
 } from "@/features/planner/types/planner-node";
+import { getPlannerRowIndentation } from "@/features/planner/utils/get-planner-row-indentation";
 
 function hasSelectedAncestor(
   node: FlattenedPlannerNode,
@@ -42,8 +42,8 @@ export function PlannerTreeItem({
   node,
   dayNumber,
   itemRef,
+  routeInfo,
   boundaryAncestor,
-  previousActivity,
   isChildTarget,
   isExpandingTarget,
   isSiblingDropActive,
@@ -55,9 +55,10 @@ export function PlannerTreeItem({
 }: {
   readonly node: FlattenedPlannerNode;
   readonly dayNumber?: number;
-  readonly itemRef: (element: HTMLLIElement | null) => void;
+  readonly itemRef: (element: HTMLDivElement | null) => void;
+  // 아래 노드의 앞머리로서 함께 움직이되, 노드의 히트박스에는 들어가지 않는다.
+  readonly routeInfo?: ReactNode;
   readonly boundaryAncestor?: FlattenedPlannerNode;
-  readonly previousActivity?: PlannerActivityNode;
   readonly isChildTarget: boolean;
   readonly isExpandingTarget: boolean;
   readonly isSiblingDropActive: boolean;
@@ -98,172 +99,186 @@ export function PlannerTreeItem({
   const isSelectedHighlightVisible = isSelected && !suppressSelectionHighlight;
   const isSelectionContextHighlightVisible = isSelectionContext && !suppressSelectionHighlight;
   const isMapHovered = hoveredItemId === node.pathId;
-  // 기존 Planner와 같이 root 다음 계층부터 30px 단위로 들여쓴다.
   // 별도의 20px 토글 칸을 항상 유지해 자식 유무와 관계없이 라벨 시작점을 맞춘다.
-  const indentation = Math.max(0, node.depth - 1) * 30;
+  const indentation = getPlannerRowIndentation(node.depth);
   const isEditingName = nameEditing.editingPathId === node.pathId;
   const canRename = node.kind === "folder" || node.kind === "day";
   const operationPathIds = multiSelectedIds.includes(node.pathId)
     ? multiSelectedIds
     : [node.pathId];
-
   return (
     <li
-      ref={(element) => {
-        setNodeRef(element);
-        itemRef(element);
-      }}
       {...attributes}
-      {...listeners}
       role="treeitem"
       aria-expanded={hasChildren ? isExpanded : undefined}
       aria-selected={isSelected}
       data-selection-state={isSelected ? "selected" : isSelectionContext ? "range" : undefined}
       data-map-highlight={isMapHovered ? "hovered" : undefined}
       data-drop-state={isChildTarget ? "child" : isExpandingTarget ? "expanding" : undefined}
-      className={`relative touch-none list-none ${
-        isSortable ? "cursor-grab active:cursor-grabbing" : "cursor-default"
-      }`}
+      className="list-none"
       style={{
-        opacity: isDragging ? 0 : 1,
-        transform: CSS.Transform.toString(isSiblingDropActive ? transform : null),
+        // 밀려날 때는 경로 정보까지 함께 움직여야 노드의 앞머리가 제자리에 남지 않는다.
+        // Translate만 쓴다. 높이가 다른 행이 섞인 목록에서 scale까지 실으면 행이 찌그러진다.
+        transform: CSS.Translate.toString(isSiblingDropActive ? transform : null),
         transition,
       }}
     >
-      {boundaryAncestor ? (
-        <div
-          aria-hidden="true"
-          data-testid="planner-root-boundary-label"
-          className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-8 items-center bg-card pr-2 pl-[22px]"
+      {routeInfo}
+      {/* 잡는 단위이자 충돌 rect다. 경로 정보를 뺀 라벨 + 메모만 여기에 들어간다. */}
+      <div
+        ref={(element) => {
+          setNodeRef(element);
+          itemRef(element);
+        }}
+        {...listeners}
+        data-planner-node=""
+        className={`relative touch-none ${
+          isSortable ? "cursor-grab active:cursor-grabbing" : "cursor-default"
+        }`}
+        style={{
+          // 잡고 있는 동안에는 원래 자리를 비우되 높이는 유지한다.
+          // visibility는 상속되므로 아래 placeholder만 다시 켜서 빈 자리를 표시한다.
+          visibility: isDragging ? "hidden" : undefined,
+        }}
+      >
+        {isDragging ? (
+          <div
+            aria-hidden="true"
+            data-testid="planner-drag-placeholder"
+            className="visible absolute inset-0 rounded-md border border-dashed border-brand/40 bg-brand/5"
+          />
+        ) : null}
+        {boundaryAncestor ? (
+          <div
+            aria-hidden="true"
+            data-testid="planner-root-boundary-label"
+            className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-8 items-center bg-card pr-2 pl-[22px]"
+          >
+            <PlannerNodeLabel
+              node={boundaryAncestor}
+              parent={
+                boundaryAncestor.parentPathId
+                  ? entityMap.get(boundaryAncestor.parentPathId)
+                  : undefined
+              }
+              className="w-full"
+            />
+          </div>
+        ) : null}
+        <PlannerTreeItemContextMenu
+          node={node}
+          commands={commands}
+          operationPathIds={operationPathIds}
+          onBeginEditing={nameEditing.begin}
+          trigger={
+            <div
+              className={`group flex h-9 items-center border-l-2 transition-colors ${
+                isChildTarget
+                  ? "planner-child-drop-fill border-brand text-foreground"
+                  : isExpandingTarget
+                    ? "border-brand/60 bg-brand/5 text-foreground"
+                    : isSelectedHighlightVisible
+                      ? "border-brand bg-brand/10 text-foreground"
+                      : isMapHovered
+                        ? "border-brand/70 bg-brand/10 text-foreground"
+                        : isSelectionContextHighlightVisible
+                          ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
+                          : "border-transparent text-foreground hover:bg-muted/70"
+              }`}
+              style={{ paddingLeft: indentation }}
+              onPointerEnter={() => setHoveredItem(node.pathId)}
+              onPointerLeave={() => {
+                if (usePlannerViewStore.getState().hoveredItemId === node.pathId) {
+                  setHoveredItem(null);
+                }
+              }}
+            />
+          }
         >
+          <span className="flex h-9 w-5 shrink-0 items-center justify-center">
+            {hasChildren ? (
+              <button
+                type="button"
+                aria-label={`${node.name} ${isExpanded ? "접기" : "펼치기"}`}
+                className="flex h-9 w-5 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleExpanded(node.pathId);
+                }}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                }}
+              >
+                {isExpanded ? (
+                  <ChevronDown aria-hidden="true" className="size-4" />
+                ) : (
+                  <ChevronRight aria-hidden="true" className="size-4" />
+                )}
+              </button>
+            ) : null}
+          </span>
           <PlannerNodeLabel
-            node={boundaryAncestor}
-            parent={
-              boundaryAncestor.parentPathId
-                ? entityMap.get(boundaryAncestor.parentPathId)
+            node={node}
+            dayNumber={dayNumber}
+            parent={node.parentPathId ? entityMap.get(node.parentPathId) : undefined}
+            className="flex-1 py-2.5 pr-2"
+            nameContent={
+              isEditingName ? (
+                <PlannerTreeItemNameInput
+                  node={node}
+                  value={nameEditing.draft}
+                  onChange={nameEditing.change}
+                  onCancel={nameEditing.cancel}
+                  onCommit={nameEditing.commit}
+                />
+              ) : undefined
+            }
+            onClick={
+              isEditingName
+                ? undefined
+                : (event) => {
+                    if (event.shiftKey) {
+                      // 범위 선택은 선택 상태만 바꾸고 지도 카메라는 이동하지 않는다.
+                      selectItem(node.pathId, true);
+                      return;
+                    }
+
+                    activateItem(node.pathId);
+                  }
+            }
+            onDoubleClick={
+              commands && canRename
+                ? (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    nameEditing.begin(node);
+                  }
                 : undefined
             }
-            className="w-full"
+            trailing={
+              node.kind === "activity" && node.startTime ? (
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                  {node.startTime}
+                </span>
+              ) : null
+            }
           />
-        </div>
-      ) : null}
-      {node.kind === "activity" && previousActivity ? (
-        <PlannerRouteInfo
-          activity={node}
-          previousActivity={previousActivity}
-          indentation={indentation}
-        />
-      ) : null}
-      <PlannerTreeItemContextMenu
-        node={node}
-        commands={commands}
-        operationPathIds={operationPathIds}
-        onBeginEditing={nameEditing.begin}
-        trigger={
-          <div
-            className={`group flex h-9 items-center border-l-2 transition-colors ${
-              isChildTarget
-                ? "planner-child-drop-fill border-brand text-foreground"
-                : isExpandingTarget
-                  ? "border-brand/60 bg-brand/5 text-foreground"
-                  : isSelectedHighlightVisible
-                    ? "border-brand bg-brand/10 text-foreground"
-                    : isMapHovered
-                      ? "border-brand/70 bg-brand/10 text-foreground"
-                      : isSelectionContextHighlightVisible
-                        ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
-                        : "border-transparent text-foreground hover:bg-muted/70"
-            }`}
-            style={{ paddingLeft: indentation }}
-            onPointerEnter={() => setHoveredItem(node.pathId)}
-            onPointerLeave={() => {
-              if (usePlannerViewStore.getState().hoveredItemId === node.pathId) {
-                setHoveredItem(null);
-              }
-            }}
-          />
-        }
-      >
-        <span className="flex h-9 w-5 shrink-0 items-center justify-center">
-          {hasChildren ? (
-            <button
-              type="button"
-              aria-label={`${node.name} ${isExpanded ? "접기" : "펼치기"}`}
-              className="flex h-9 w-5 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
-              onClick={(event) => {
-                event.stopPropagation();
-                toggleExpanded(node.pathId);
-              }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-              }}
-            >
-              {isExpanded ? (
-                <ChevronDown aria-hidden="true" className="size-4" />
-              ) : (
-                <ChevronRight aria-hidden="true" className="size-4" />
-              )}
-            </button>
+          {node.kind === "day" ? (
+            <DayMapVisibilityToggle dayPathId={node.pathId} dayName={node.name} />
           ) : null}
-        </span>
-        <PlannerNodeLabel
-          node={node}
-          dayNumber={dayNumber}
-          parent={node.parentPathId ? entityMap.get(node.parentPathId) : undefined}
-          className="flex-1 py-2.5 pr-2"
-          nameContent={
-            isEditingName ? (
-              <PlannerTreeItemNameInput
-                node={node}
-                value={nameEditing.draft}
-                onChange={nameEditing.change}
-                onCancel={nameEditing.cancel}
-                onCommit={nameEditing.commit}
-              />
-            ) : undefined
-          }
-          onClick={
-            isEditingName
-              ? undefined
-              : (event) => {
-                  if (event.shiftKey) {
-                    // 범위 선택은 선택 상태만 바꾸고 지도 카메라는 이동하지 않는다.
-                    selectItem(node.pathId, true);
-                    return;
-                  }
-
-                  activateItem(node.pathId);
-                }
-          }
-          onDoubleClick={
-            commands && canRename
-              ? (event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  nameEditing.begin(node);
-                }
-              : undefined
-          }
-          trailing={
-            node.kind === "activity" && node.startTime ? (
-              <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                {node.startTime}
-              </span>
-            ) : null
-          }
-        />
-        {node.kind === "day" ? (
-          <DayMapVisibilityToggle dayPathId={node.pathId} dayName={node.name} />
+        </PlannerTreeItemContextMenu>
+        {node.kind === "activity" ? (
+          <PlannerActivityMemo
+            activity={node}
+            indentation={indentation}
+            editing={memoEditing}
+            commands={commands}
+            className={
+              isSelectedHighlightVisible ? "border-brand bg-brand/5" : "border-transparent"
+            }
+          />
         ) : null}
-      </PlannerTreeItemContextMenu>
-      {node.kind === "activity" ? (
-        <PlannerActivityMemo
-          activity={node}
-          indentation={indentation}
-          editing={memoEditing}
-          commands={commands}
-        />
-      ) : null}
+      </div>
     </li>
   );
 }

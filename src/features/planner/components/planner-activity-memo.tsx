@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import type { PlannerMemoEditing } from "@/features/planner/hooks/use-planner-memo-editing";
 import type { PlannerNodeEditingCommands } from "@/features/planner/types/planner-editing-commands";
 import type { PlannerActivityNode } from "@/features/planner/types/planner-node";
+import { cn } from "@/lib/utils";
 
 // Activity 행 아래에 붙는 메모 영역이다.
 // 메모가 없고 편집 중도 아니면 행 높이를 늘리지 않도록 아무것도 그리지 않는다.
@@ -10,11 +11,13 @@ export function PlannerActivityMemo({
   indentation,
   editing,
   commands,
+  className,
 }: {
   readonly activity: PlannerActivityNode;
   readonly indentation: number;
   readonly editing: PlannerMemoEditing;
   readonly commands?: PlannerNodeEditingCommands;
+  readonly className?: string;
 }) {
   const isEditing = editing.editingPathId === activity.pathId;
 
@@ -24,7 +27,7 @@ export function PlannerActivityMemo({
 
   return (
     <div
-      className="border-l-2 border-transparent pr-2 pb-2"
+      className={cn("border-l-2 border-transparent pr-2 pb-2", className)}
       style={{ paddingLeft: indentation + 44 }}
       onPointerDown={(event) => event.stopPropagation()}
     >

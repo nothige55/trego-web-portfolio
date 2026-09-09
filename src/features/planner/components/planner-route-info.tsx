@@ -6,14 +6,8 @@ import {
   formatPlannerDistance,
 } from "@/features/planner/utils/calculate-planner-distance";
 
-// 행 위에 끼어드는 고정 높이다. 드래그 미리보기가 이만큼 위에서 시작하므로 상수로 공유한다.
-export const PLANNER_ROUTE_INFO_HEIGHT = 30;
-
-// 노드 아이콘(16px)이 토글 칸(20px) 다음에 오므로 그 가운데가 세로선의 x 위치다.
-const CONNECTOR_OFFSET = 28;
-
-const pillClassName =
-  "flex items-center rounded border border-[#F5F5F5] p-1 text-[10px] leading-none text-[#9D9D9D]";
+// 두 행 사이에 끼어드는 고정 높이다.
+const PLANNER_ROUTE_INFO_HEIGHT = 24;
 
 function getTravelMode(mode: string | null) {
   if (mode === "walk" || mode === "walking") return { label: "도보", icon: Footprints };
@@ -21,6 +15,9 @@ function getTravelMode(mode: string | null) {
   return { label: "자동차", icon: Car };
 }
 
+// 두 장소 사이에 끼어드는 보조 정보다.
+// 행 자체보다 앞에 나서지 않도록 테두리 없이 작은 글씨로만 얹되,
+// 읽는 것(거리, 이동 수단)과 누르는 것(길찾기)은 색과 간격으로 갈라 놓는다.
 export function PlannerRouteInfo({
   activity,
   previousActivity,
@@ -44,37 +41,31 @@ export function PlannerRouteInfo({
 
   return (
     <div
-      className="relative flex items-center"
+      className="flex items-center text-[10px] leading-none"
       style={{ height: PLANNER_ROUTE_INFO_HEIGHT, paddingLeft: indentation + 44 }}
       data-testid={`planner-route-${activity.pathId}`}
     >
-      {/* 앞뒤 장소의 마커를 잇는 세로선. Day 색을 그대로 이어받는다. */}
-      <span
-        aria-hidden="true"
-        className="absolute inset-y-0 border-l"
-        style={{ left: indentation + CONNECTOR_OFFSET, borderColor: activity.color ?? undefined }}
-      />
-      {/* 선 위에 겹쳐 그리려고 위치를 잡는다. 음수 z-index는 카드 배경 뒤로 숨는다. */}
-      <div className="relative flex w-fit items-center gap-2">
-        <span className={`${pillClassName} w-10 justify-center bg-white`}>
-          {formatPlannerDistance(distance)}
-        </span>
-        <span className={`${pillClassName} gap-1`}>
+      <span className="flex items-center gap-1.5 text-[#9D9D9D]">
+        {/* 행과 행 사이에 끼어든 줄임을 알리는 짧은 선. 아이콘 열의 세로선을 대신한다. */}
+        <span aria-hidden="true" className="h-px w-2.5 bg-[#C4C4C4]" />
+        <span className="tabular-nums">{formatPlannerDistance(distance)}</span>
+        <span aria-hidden="true">·</span>
+        <span className="flex items-center gap-1">
           <TravelModeIcon aria-hidden="true" className="size-2.5" />
           {travelModeLabel}
           {activity.travelTime && activity.travelTime > 0 ? ` ${activity.travelTime}분` : ""}
         </span>
-        <a
-          className="rounded border border-transparent p-1 text-[10px] leading-none text-[#9D9D9D] underline hover:text-foreground"
-          href={directionsUrl.toString()}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`${previousActivity.name}에서 ${activity.name}까지 길찾기`}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          길찾기
-        </a>
-      </div>
+      </span>
+      <a
+        className="ml-3 text-brand underline underline-offset-2 hover:text-brand-hover"
+        href={directionsUrl.toString()}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${previousActivity.name}에서 ${activity.name}까지 길찾기`}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        길찾기
+      </a>
     </div>
   );
 }

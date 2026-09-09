@@ -51,19 +51,6 @@ describe("PlannerRouteInfo", () => {
     ).toHaveAttribute("href", expect.stringContaining("origin=33.5104%2C126.4914"));
   });
 
-  it("draws the connector line in the Day color at the node icon column", () => {
-    const { container } = render(
-      <PlannerRouteInfo
-        previousActivity={activity({ latitude: 33.5104, longitude: 126.4914 })}
-        activity={activity({ color: "#2196F3" })}
-        indentation={30}
-      />,
-    );
-
-    const connector = container.querySelector("span[aria-hidden='true']");
-    expect(connector).toHaveStyle({ borderColor: "#2196F3", left: "58px" });
-  });
-
   it("renders nothing when either place has no coordinates", () => {
     const { container } = render(
       <PlannerRouteInfo
