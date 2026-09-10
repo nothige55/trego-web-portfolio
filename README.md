@@ -166,7 +166,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
-REST API와 SignalR Hub를 제공하는 백엔드가 필요합니다. 개발 시 환경변수를 비우면 Vite가 `/api`와 `/project`를 `http://localhost:3000`으로 전달합니다.
+`/demo`는 백엔드와 로그인 없이 동작합니다. 브라우저 안의 가짜 서버가 실제 Hub처럼 요청을 접속자 전원에게 되쏘고, 가상의 동료가 주기적으로 일정을 편집합니다. 연결을 끊었다가 다시 이으면 놓친 변경이 재조회로 복원되는 과정을 직접 확인할 수 있습니다.
+
+그 밖의 화면은 REST API와 SignalR Hub를 제공하는 백엔드가 필요합니다. 개발 시 환경변수를 비우면 Vite가 `/api`와 `/project`를 `http://localhost:3000`으로 전달합니다.
 
 | 환경변수                   | 필수        | 설명                                                                   |
 | -------------------------- | ----------- | ---------------------------------------------------------------------- |
@@ -185,7 +187,7 @@ npm test              # Vitest
 npm run build         # tsc -b + vite build
 ```
 
-mock server는 쓰지 않습니다. WebSocket 상태 전이와 서버 발신 이벤트를 표현할 수 없기 때문입니다. 대신 화면 컴포넌트가 `clientFactory`와 `restClient`를 주입받고, 테스트는 상태 전이와 이벤트 emit이 가능한 fake SignalR 클라이언트를 넣습니다.
+mock server는 쓰지 않습니다. WebSocket 상태 전이와 서버 발신 이벤트를 표현할 수 없기 때문입니다. 대신 화면 컴포넌트가 `clientFactory`와 `restClient`를 주입받고, 테스트는 상태 전이와 이벤트 emit이 가능한 fake SignalR 클라이언트를 넣습니다. `/demo`도 같은 주입 지점을 쓰므로 feature 코드에는 데모 분기가 없습니다.
 
 ## 기술 구성
 
