@@ -44,10 +44,22 @@ describe("PlannerRouteInfo", () => {
       />,
     );
 
-    expect(screen.getByText("직선 3.9km")).toBeInTheDocument();
+    expect(screen.getByText("3.9km")).toBeInTheDocument();
     expect(screen.getByText("자동차 15분")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "제주국제공항에서 이호테우해변까지 길찾기" }),
     ).toHaveAttribute("href", expect.stringContaining("origin=33.5104%2C126.4914"));
+  });
+
+  it("renders nothing when either place has no coordinates", () => {
+    const { container } = render(
+      <PlannerRouteInfo
+        previousActivity={activity({ latitude: null, longitude: null })}
+        activity={activity({})}
+        indentation={30}
+      />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
   });
 });

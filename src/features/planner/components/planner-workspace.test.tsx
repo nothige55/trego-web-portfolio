@@ -58,7 +58,9 @@ describe("PlannerWorkspace", () => {
           treeItem.textContent?.includes(candidate),
         );
         const top = name ? (topByName.get(name) ?? 100) : 100;
-        treeItem.getBoundingClientRect = () => ({ top }) as DOMRect;
+        // breadcrumb 기준은 경로 정보를 뺀 노드 박스의 상단이다.
+        const nodeBox = treeItem.querySelector("[data-planner-node]") ?? treeItem;
+        nodeBox.getBoundingClientRect = () => ({ top }) as DOMRect;
       });
   }
 

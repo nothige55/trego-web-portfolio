@@ -19,6 +19,7 @@ import type {
   PlannerNodePathId,
   PlannerTree,
 } from "@/features/planner/types/planner-node";
+import type { PlannerDragDestination } from "@/features/planner/utils/build-planner-drag-projection";
 
 const EMPTY_CHILD_DROP_DELAY = 800;
 const COLLAPSED_EXPAND_DELAY = 1_000;
@@ -30,6 +31,8 @@ interface UsePlannerDragAndDropParams {
   readonly visibleItems: readonly FlattenedPlannerNode[];
   readonly expandedIds: ReadonlySet<PlannerNodePathId>;
   readonly expandNode: (pathId: PlannerNodePathId) => void;
+  // 목록의 좌우 경계다. 포인터가 이 밖으로 나가면 놓을 자리가 없는 것으로 본다.
+  readonly getListBounds?: () => Readonly<{ left: number; right: number }> | null;
   readonly moveNode: (
     pathId: PlannerNodePathId,
     destination: {
@@ -46,6 +49,7 @@ export function usePlannerDragAndDrop({
   visibleItems,
   expandedIds,
   expandNode,
+  getListBounds,
   moveNode,
 }: UsePlannerDragAndDropParams) {
   const sensors = useSensors(
@@ -59,6 +63,10 @@ export function usePlannerDragAndDrop({
     null,
   );
   const [isSiblingDropActive, setIsSiblingDropActive] = useState(false);
+  // 포인터가 목록 좌우 밖에 있는지다. 이때만 잡은 노드를 목록에서 빼서 보여 준다.
+  const [isOutsideList, setIsOutsideList] = useState(false);
+  // 지금 놓으면 들어갈 자리다. 경로 정보 미리보기가 이 값으로 이웃 관계를 다시 계산한다.
+  const [dropDestination, setDropDestination] = useState<PlannerDragDestination | null>(null);
   const [horizontalOffset, setHorizontalOffset] = useState(0);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverKeyRef = useRef<string | null>(null);
@@ -85,7 +93,52 @@ export function usePlannerDragAndDrop({
     expandedTargetActiveTopRef.current = null;
     setActivePathId(null);
     setIsSiblingDropActive(false);
+    setIsOutsideList(false);
+    setDropDestination(null);
     setHorizontalOffset(0);
+  }
+
+  // 잡은 노드를 뺐다가 원래 자리에 도로 끼우는 목적지다.
+  // 규칙 계산이 "unchanged"를 돌려줄 때, 목록을 원래 모습 그대로 보여 주려고 쓴다.
+  function getCurrentDestination(pathId: PlannerNodePathId): PlannerDragDestination | null {
+    const node = tree.entityMap.get(pathId);
+    if (!node?.parentPathId) {
+      return null;
+    }
+
+    const siblingIndex = (tree.childrenMap.get(node.parentPathId) ?? []).findIndex(
+      (sibling) => sibling.pathId === pathId,
+    );
+    return siblingIndex < 0 ? null : { parentPathId: node.parentPathId, siblingIndex };
+  }
+
+  // closestCenter는 포인터가 어디에 있든 가장 가까운 행을 늘 하나 고른다. 그래서 목록을
+  // 옆으로 벗어난 것과 목록 위에 있는 것을 구분하지 못한다. 포인터의 x를 직접 보고 가른다.
+  function isPointerOutsideList(event: DragMoveEvent | DragEndEvent): boolean {
+    const bounds = getListBounds?.();
+    const activator = event.activatorEvent;
+    if (!bounds || !(activator instanceof PointerEvent || activator instanceof MouseEvent)) {
+      return false;
+    }
+
+    const pointerX = activator.clientX + event.delta.x;
+    return pointerX < bounds.left || pointerX > bounds.right;
+  }
+
+  // dragMove는 포인터가 움직일 때마다 들어온다. 값이 같은데도 새 객체를 넣으면 매 이벤트마다
+  // 리렌더가 나고, 그 사이 끼어든 렌더 때문에 dnd-kit이 낸 이동량이 행마다 어긋난다.
+  function updateDropDestination(next: PlannerDragDestination | null): void {
+    setDropDestination((previous) => {
+      if (
+        previous === next ||
+        (previous?.parentPathId === next?.parentPathId &&
+          previous?.siblingIndex === next?.siblingIndex)
+      ) {
+        return previous;
+      }
+
+      return next;
+    });
   }
 
   useEffect(
@@ -122,9 +175,20 @@ export function usePlannerDragAndDrop({
   function handleDragMove(event: DragMoveEvent): void {
     setHorizontalOffset(event.delta.x);
 
+    const isOutside = isPointerOutsideList(event);
+    setIsOutsideList(isOutside);
+    if (isOutside) {
+      // 목록 밖에서는 잡은 노드가 잠시 빠진 것으로 보여 준다.
+      clearHoverState();
+      setIsSiblingDropActive(false);
+      updateDropDestination(null);
+      return;
+    }
+
     if (!rootPathId || !activePathId || !event.over) {
       clearHoverState();
       setIsSiblingDropActive(false);
+      updateDropDestination(null);
       return;
     }
 
@@ -151,6 +215,7 @@ export function usePlannerDragAndDrop({
 
     if (childResult?.accepted && (children.length === 0 || !expandedIds.has(overPathId))) {
       setIsSiblingDropActive(false);
+      updateDropDestination(childResult.destination);
       const hoverKey = `child:${overPathId}`;
       if (hoverKeyRef.current === hoverKey) {
         return;
@@ -198,10 +263,19 @@ export function usePlannerDragAndDrop({
       horizontalOffset: event.delta.x,
     });
     setIsSiblingDropActive(siblingResult.accepted || siblingResult.reason === "unchanged");
+    // 받아 주지 않는 자리 위에서는 목적지가 없다. 그때는 잡은 노드가 빠진 목록만 보여 준다.
+    updateDropDestination(
+      siblingResult.accepted
+        ? siblingResult.destination
+        : siblingResult.reason === "unchanged"
+          ? getCurrentDestination(activePathId)
+          : null,
+    );
   }
 
   function handleDragEnd(event: DragEndEvent): void {
-    if (!rootPathId || !activePathId || !event.over) {
+    // 목록 밖에서 놓으면 자리를 고르지 않은 것이므로 이동 없이 되돌린다.
+    if (!rootPathId || !activePathId || !event.over || isPointerOutsideList(event)) {
       resetDragState();
       return;
     }
@@ -252,11 +326,13 @@ export function usePlannerDragAndDrop({
   return {
     activePathId,
     childTargetPathId,
+    dropDestination,
     expandingTargetPathId,
     handleDragCancel: resetDragState,
     handleDragEnd,
     handleDragMove,
     handleDragStart,
+    isOutsideList,
     isSiblingDropActive,
     sensors,
     sortableItems,
