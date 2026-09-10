@@ -1,4 +1,5 @@
 import Axios, {
+  type AxiosAdapter,
   type AxiosError,
   AxiosHeaders,
   type AxiosInstance,
@@ -11,6 +12,8 @@ import { env } from "@/config/env";
 type AccessTokenProvider = () => string | null | undefined;
 
 export type ApiClientOptions = {
+  // 요청을 네트워크 대신 다른 전송 계층으로 보낼 때 쓴다. interceptor와 응답 처리는 그대로 거친다.
+  adapter?: AxiosAdapter;
   baseURL?: string;
   getAccessToken?: AccessTokenProvider;
   headers?: AxiosRequestConfig["headers"];
@@ -58,6 +61,7 @@ function addAccessToken(
 }
 
 export function createApiClient({
+  adapter,
   baseURL = env.apiBaseUrl,
   getAccessToken,
   headers,
@@ -66,6 +70,7 @@ export function createApiClient({
   withCredentials = false,
 }: ApiClientOptions = {}): ApiClient {
   const client = Axios.create({
+    adapter,
     baseURL,
     headers: {
       Accept: "application/json",
