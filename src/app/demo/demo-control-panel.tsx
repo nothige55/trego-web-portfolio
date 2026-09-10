@@ -56,7 +56,7 @@ export function DemoControlPanel({
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             서버는 브라우저 안에서 흉내 내고, {collaboratorName}의 편집·채팅·커서는
-            시뮬레이션입니다. 화면 코드는 실제 서비스와 같습니다.
+            시뮬레이션입니다. 화면 코드는 백엔드에 연결할 때와 같습니다.
           </p>
         </div>
         <Button
