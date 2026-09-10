@@ -14,6 +14,9 @@ vi.mock("@/features/planner/components/planner-map", () => ({
 
 const dndState = vi.hoisted(() => ({
   activePathId: null as string | null,
+  dropDestination: null as { parentPathId: string; siblingIndex: number } | null,
+  isOutsideList: false,
+  isSiblingDropActive: false,
   moveNode: null as ((pathId: string, destination: unknown) => void) | null,
 }));
 
@@ -30,12 +33,14 @@ vi.mock("@/features/planner/dnd/use-planner-drag-and-drop", () => ({
     return {
       activePathId: dndState.activePathId,
       childTargetPathId: null,
+      dropDestination: dndState.dropDestination,
       expandingTargetPathId: null,
       handleDragCancel: vi.fn(),
       handleDragEnd: vi.fn(),
       handleDragMove: vi.fn(),
       handleDragStart: vi.fn(),
-      isSiblingDropActive: false,
+      isOutsideList: dndState.isOutsideList,
+      isSiblingDropActive: dndState.isSiblingDropActive,
       sensors: [],
       sortableItems: visibleItems,
     };
@@ -54,6 +59,9 @@ function createPlannerCommands(): PlannerNodeEditingCommands {
 describe("PlannerSchedulePanel", () => {
   afterEach(() => {
     dndState.activePathId = null;
+    dndState.dropDestination = null;
+    dndState.isOutsideList = false;
+    dndState.isSiblingDropActive = false;
     dndState.moveNode = null;
     usePlannerViewStore.getState().reset();
   });
@@ -359,10 +367,15 @@ describe("PlannerSchedulePanel", () => {
     // 노드와 함께 움직이도록 같은 treeitem 안에 있되, 잡는 단위 밖에 놓인다.
     expect(ihoItem?.contains(routeInfo)).toBe(true);
     expect(nodeBox?.contains(routeInfo)).toBe(false);
-    expect(routeInfo.closest("[data-planner-route-slot]")?.nextElementSibling).toBe(nodeBox);
+    // 노드 박스 바로 앞자리다. 밀림 transform을 자식에 걸려고 한 겹 더 감싸므로 포함으로 본다.
+    expect(
+      nodeBox?.previousElementSibling?.contains(routeInfo.closest("[data-planner-route-slot]")),
+    ).toBe(true);
   });
 
-  it("hides only the route info that the dragged node sits between", async () => {
+  // 경로 정보는 노드의 속성이 아니라 두 장소 사이의 구간이라, 잡은 노드가 빠지면
+  // 사라지는 게 아니라 앞뒤가 이어붙는다. 드래그 중에도 지금 놓으면 나올 값을 보여 준다.
+  it("reconnects the route across the place that is being dragged out", async () => {
     const user = userEvent.setup();
     usePlannerViewStore.getState().load(demoPlannerProject.nodes);
     usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
@@ -374,17 +387,89 @@ describe("PlannerSchedulePanel", () => {
 
     await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
     await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
-    const slotOf = (pathId: string) =>
-      screen.getByTestId(`planner-route-${pathId}`).closest("[data-planner-route-slot]");
+    expect(
+      within(screen.getByTestId("planner-route-day-one-aewol")).getByRole("link"),
+    ).toHaveAccessibleName("이호테우해변에서 애월 해안도로까지 길찾기");
+
+    // 목록 밖(좌우)으로 끌어내 목적지가 없는 상태다.
+    dndState.activePathId = "day-one-iho";
+    dndState.isOutsideList = true;
+    rerender(<PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />);
+
+    // 이호테우해변이 빠진 자리에서 앞뒤 장소가 곧바로 이어진다.
+    expect(
+      within(screen.getByTestId("planner-route-day-one-aewol")).getByRole("link"),
+    ).toHaveAccessibleName("제주국제공항에서 애월 해안도로까지 길찾기");
+    // 목록 밖으로 나온 노드에는 들어오는 구간이 없다.
+    expect(screen.queryByTestId("planner-route-day-one-iho")).not.toBeInTheDocument();
+    // 떨어져 있는 구간은 그대로다.
+    expect(
+      within(screen.getByTestId("planner-route-day-one-hyeopjae")).getByRole("link"),
+    ).toHaveAccessibleName("애월 해안도로에서 협재해수욕장까지 길찾기");
+  });
+
+  // 받아 주지 않는 자리나 컨테이너 안으로 넣는 중에는 놓아도 순서가 바뀌지 않으므로
+  // 목록도 경로 정보도 원래 모습 그대로 둔다.
+  it("leaves the schedule untouched while hovering where it cannot land", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    const onMoveNode = vi.fn();
+    const { rerender } = render(
+      <PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />,
+    );
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
 
     dndState.activePathId = "day-one-iho";
     rerender(<PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />);
 
-    // 잡은 노드로 들어오는 구간과 나가는 구간만 값이 무의미해진다.
-    expect(slotOf("day-one-iho")).toHaveStyle({ visibility: "hidden" });
-    expect(slotOf("day-one-aewol")).toHaveStyle({ visibility: "hidden" });
-    // 떨어져 있는 구간은 그대로 보인다.
-    expect(slotOf("day-one-hyeopjae")).not.toHaveStyle({ visibility: "hidden" });
+    expect(
+      within(screen.getByTestId("planner-route-day-one-iho")).getByRole("link"),
+    ).toHaveAccessibleName("제주국제공항에서 이호테우해변까지 길찾기");
+    expect(
+      within(screen.getByTestId("planner-route-day-one-aewol")).getByRole("link"),
+    ).toHaveAccessibleName("이호테우해변에서 애월 해안도로까지 길찾기");
+  });
+
+  it("previews the two segments that a drop position would create", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    const onMoveNode = vi.fn();
+    const { rerender } = render(
+      <PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />,
+    );
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+
+    // 이호테우해변을 빼서 제주국제공항과 애월 해안도로 사이에 도로 끼우는 자리다.
+    dndState.activePathId = "day-one-iho";
+    dndState.isSiblingDropActive = true;
+    dndState.dropDestination = { parentPathId: "day-one", siblingIndex: 1 };
+    rerender(<PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />);
+
+    expect(
+      within(screen.getByTestId("planner-route-day-one-iho")).getByRole("link"),
+    ).toHaveAccessibleName("제주국제공항에서 이호테우해변까지 길찾기");
+    expect(
+      within(screen.getByTestId("planner-route-day-one-aewol")).getByRole("link"),
+    ).toHaveAccessibleName("이호테우해변에서 애월 해안도로까지 길찾기");
+
+    // 맨 뒤로 옮기면 두 구간 모두 새 이웃으로 다시 잡힌다.
+    dndState.dropDestination = { parentPathId: "day-one", siblingIndex: 3 };
+    rerender(<PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />);
+
+    expect(
+      within(screen.getByTestId("planner-route-day-one-iho")).getByRole("link"),
+    ).toHaveAccessibleName("협재해수욕장에서 이호테우해변까지 길찾기");
+    expect(
+      within(screen.getByTestId("planner-route-day-one-aewol")).getByRole("link"),
+    ).toHaveAccessibleName("제주국제공항에서 애월 해안도로까지 길찾기");
   });
 
   it("extends the selection highlight from the label to its memo", async () => {

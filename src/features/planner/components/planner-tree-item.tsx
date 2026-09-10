@@ -1,11 +1,11 @@
 import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useCallback } from "react";
 
 import { DayMapVisibilityToggle } from "@/features/planner/components/day-map-visibility-toggle";
 import { PlannerActivityMemo } from "@/features/planner/components/planner-activity-memo";
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
+import { PLANNER_ROUTE_INFO_HEIGHT } from "@/features/planner/components/planner-route-info";
 import { PlannerTreeItemContextMenu } from "@/features/planner/components/planner-tree-item-context-menu";
 import { PlannerTreeItemNameInput } from "@/features/planner/components/planner-tree-item-name-input";
 import type { PlannerMemoEditing } from "@/features/planner/hooks/use-planner-memo-editing";
@@ -41,12 +41,14 @@ function hasSelectedAncestor(
 export function PlannerTreeItem({
   node,
   dayNumber,
-  itemRef,
+  registerItem,
   routeInfo,
+  dragRouteInfo,
+  dragOffset,
   boundaryAncestor,
+  isDropTargetVisible,
   isChildTarget,
   isExpandingTarget,
-  isSiblingDropActive,
   isSortable,
   suppressSelectionHighlight,
   commands,
@@ -55,13 +57,22 @@ export function PlannerTreeItem({
 }: {
   readonly node: FlattenedPlannerNode;
   readonly dayNumber?: number;
-  readonly itemRef: (element: HTMLDivElement | null) => void;
-  // 아래 노드의 앞머리로서 함께 움직이되, 노드의 히트박스에는 들어가지 않는다.
+  // 렌더마다 새 함수가 오면 ref가 떨어졌다 붙어 dnd-kit이 droppable을 다시 잰다.
+  // pathId와 함께 부르는 고정 함수를 받아 이 안에서 안정된 콜백으로 묶는다.
+  readonly registerItem: (pathId: PlannerNodePathId, element: HTMLDivElement | null) => void;
+  // 평상시 행 머리에 붙는 경로 정보 칸이다. 노드의 히트박스에는 들어가지 않는다.
+  // 드래그 중에는 레이아웃 높이만 지키는 빈 칸으로 남고, 내용은 dragRouteInfo가 그린다.
   readonly routeInfo?: ReactNode;
+  // 드래그 중 경로 정보다. 노드 박스 바로 위에 겹쳐 그려 노드와 함께 옮겨 가고,
+  // 레이아웃 높이에는 영향을 주지 않는다.
+  readonly dragRouteInfo?: ReactNode;
+  // 드래그 중 노드 박스를 옮길 거리다. 지금 놓았을 때의 배치에서 계산한다.
+  readonly dragOffset: number;
   readonly boundaryAncestor?: FlattenedPlannerNode;
+  // 놓을 자리가 있을 때만 빈 자리를 표시한다. 목록 밖에서는 빠진 것처럼 보여야 한다.
+  readonly isDropTargetVisible: boolean;
   readonly isChildTarget: boolean;
   readonly isExpandingTarget: boolean;
-  readonly isSiblingDropActive: boolean;
   readonly isSortable: boolean;
   readonly suppressSelectionHighlight: boolean;
   readonly commands?: PlannerNodeEditingCommands;
@@ -79,7 +90,9 @@ export function PlannerTreeItem({
   const activateItem = usePlannerViewStore((state) => state.activateItem);
   const selectItem = usePlannerViewStore((state) => state.selectItem);
   const setHoveredItem = usePlannerViewStore((state) => state.setHoveredItem);
-  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+  // 밀림은 dnd-kit의 정렬 전략이 아니라 패널이 계산한 dragOffset으로 그린다.
+  // 경로 정보 칸이 드래그 도중 생기거나 사라지는 걸 전략은 모르기 때문이다.
+  const { attributes, isDragging, listeners, setNodeRef } = useSortable({
     id: node.pathId,
     disabled: !isSortable,
   });
@@ -106,6 +119,14 @@ export function PlannerTreeItem({
   const operationPathIds = multiSelectedIds.includes(node.pathId)
     ? multiSelectedIds
     : [node.pathId];
+  // 렌더마다 새 ref 함수가 가면 노드가 떨어졌다 붙어 dnd-kit이 droppable을 다시 잰다.
+  const setRefs = useCallback(
+    (element: HTMLDivElement | null) => {
+      setNodeRef(element);
+      registerItem(node.pathId, element);
+    },
+    [node.pathId, registerItem, setNodeRef],
+  );
   return (
     <li
       {...attributes}
@@ -116,32 +137,34 @@ export function PlannerTreeItem({
       data-map-highlight={isMapHovered ? "hovered" : undefined}
       data-drop-state={isChildTarget ? "child" : isExpandingTarget ? "expanding" : undefined}
       className="list-none"
-      style={{
-        // 밀려날 때는 경로 정보까지 함께 움직여야 노드의 앞머리가 제자리에 남지 않는다.
-        // Translate만 쓴다. 높이가 다른 행이 섞인 목록에서 scale까지 실으면 행이 찌그러진다.
-        transform: CSS.Translate.toString(isSiblingDropActive ? transform : null),
-        transition,
-      }}
     >
       {routeInfo}
       {/* 잡는 단위이자 충돌 rect다. 경로 정보를 뺀 라벨 + 메모만 여기에 들어간다. */}
       <div
-        ref={(element) => {
-          setNodeRef(element);
-          itemRef(element);
-        }}
+        ref={setRefs}
         {...listeners}
         data-planner-node=""
         className={`relative touch-none ${
           isSortable ? "cursor-grab active:cursor-grabbing" : "cursor-default"
         }`}
         style={{
+          // transform은 dnd-kit이 재는 이 요소에 직접 건다. 부모(li)에 걸면 다시 잴 때
+          // 그 이동량이 rect에 섞인다(ignoreTransform은 잰 요소 자신의 것만 되돌린다).
+          transform: dragOffset ? `translate3d(0, ${dragOffset}px, 0)` : undefined,
           // 잡고 있는 동안에는 원래 자리를 비우되 높이는 유지한다.
           // visibility는 상속되므로 아래 placeholder만 다시 켜서 빈 자리를 표시한다.
           visibility: isDragging ? "hidden" : undefined,
         }}
       >
-        {isDragging ? (
+        {dragRouteInfo ? (
+          <div
+            className="pointer-events-none visible absolute inset-x-0 bottom-full"
+            style={{ height: PLANNER_ROUTE_INFO_HEIGHT }}
+          >
+            {dragRouteInfo}
+          </div>
+        ) : null}
+        {isDragging && isDropTargetVisible ? (
           <div
             aria-hidden="true"
             data-testid="planner-drag-placeholder"

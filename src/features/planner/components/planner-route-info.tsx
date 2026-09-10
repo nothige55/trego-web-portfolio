@@ -7,7 +7,8 @@ import {
 } from "@/features/planner/utils/calculate-planner-distance";
 
 // 두 행 사이에 끼어드는 고정 높이다.
-const PLANNER_ROUTE_INFO_HEIGHT = 24;
+// 드래그 중에는 자리를 이 높이로 붙들어 둬야 하므로 슬롯을 그리는 쪽에서도 쓴다.
+export const PLANNER_ROUTE_INFO_HEIGHT = 24;
 
 function getTravelMode(mode: string | null) {
   if (mode === "walk" || mode === "walking") return { label: "도보", icon: Footprints };
@@ -39,9 +40,10 @@ export function PlannerRouteInfo({
   );
   directionsUrl.searchParams.set("destination", `${activity.latitude},${activity.longitude}`);
 
+  // 배경을 깔아 둔다. 드래그로 행이 옮겨 갈 때 이 띠가 다른 행 위에 비쳐 보이면 안 된다.
   return (
     <div
-      className="flex items-center text-[10px] leading-none"
+      className="flex items-center bg-card text-[10px] leading-none"
       style={{ height: PLANNER_ROUTE_INFO_HEIGHT, paddingLeft: indentation + 44 }}
       data-testid={`planner-route-${activity.pathId}`}
     >
