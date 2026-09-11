@@ -178,6 +178,10 @@ npm run dev
 
 환경변수는 `src/config/env.ts`에서만 읽고 검증합니다. 토큰은 `.env.local`에만 두고 커밋하지 않습니다.
 
+### 배포
+
+Vercel에 정적으로 올립니다. `vercel.json`이 모든 경로를 `index.html`로 보내고, 백엔드 없는 배포이므로 `/`는 `/demo`로 보냅니다. `VITE_MAPBOX_ACCESS_TOKEN`은 Vercel 프로젝트 환경변수에 넣고, Mapbox 쪽에서 그 토큰의 허용 URL을 배포 도메인으로 제한합니다.
+
 ## 검증
 
 ```bash
