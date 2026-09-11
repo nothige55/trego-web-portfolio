@@ -4,7 +4,10 @@
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import type { PlannerDateRangeInput } from "@/features/planner/operations/planner-date-range";
 import type { PlannerOperationCommand } from "@/features/planner/operations/planner-operation-command";
-import type { PlannerCreateNodeDraft } from "@/features/planner/operations/planner-operations";
+import type {
+  PlannerCreateNodeDraft,
+  PlannerPlaceActivityDraft,
+} from "@/features/planner/operations/planner-operations";
 import type { PlannerRealtimeCommands } from "@/features/planner/realtime/planner-realtime";
 import type { PlannerNodePathId } from "@/features/planner/types/planner-node";
 
@@ -18,6 +21,8 @@ export type PlannerNodeEditingCommands = Pick<
   "deleteNode" | "updateActivity" | "updateDay" | "updateFolder"
 > & {
   readonly createNode?: (draft: PlannerCreateNodeDraft) => Promise<void>;
+  // 만든 활동의 pathId를 돌려주어 호출한 쪽이 곧바로 선택·지도 포커스를 옮길 수 있게 한다.
+  readonly createPlaceActivity?: (draft: PlannerPlaceActivityDraft) => Promise<PlannerNodePathId>;
   readonly deleteNodes?: (pathIds: readonly PlannerNodePathId[]) => Promise<void>;
   readonly editActivityMemo?: (pathId: PlannerNodePathId) => void;
   readonly extendDateRange?: () => Promise<void>;
