@@ -32,7 +32,7 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-// 노드 응답만 테스트마다 바꿔 끼울 수 있는 REST client다.
+// 노드 응답만 테스트마다 바꿔 끼울 수 있는 REST client
 function createRestClient() {
   let getNodes: () => Promise<unknown> = async () => rootFolder("Initial");
   const get = vi.fn(async (url: string): Promise<unknown> => {

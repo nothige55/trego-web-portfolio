@@ -1,11 +1,12 @@
+// Activity 행 아래에 붙는 메모 영역
+// 메모가 없고 편집 중도 아니면 행 높이를 늘리지 않도록 아무것도 그리지 않음
+
 import { Button } from "@/components/ui/button";
 import type { PlannerMemoEditing } from "@/features/planner/hooks/use-planner-memo-editing";
 import type { PlannerNodeEditingCommands } from "@/features/planner/types/planner-editing-commands";
 import type { PlannerActivityNode } from "@/features/planner/types/planner-node";
 import { cn } from "@/lib/utils";
 
-// Activity 행 아래에 붙는 메모 영역이다.
-// 메모가 없고 편집 중도 아니면 행 높이를 늘리지 않도록 아무것도 그리지 않는다.
 export function PlannerActivityMemo({
   activity,
   indentation,

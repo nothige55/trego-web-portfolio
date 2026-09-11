@@ -1,3 +1,6 @@
+// Hub 이벤트 payload를 PlannerNode 배열에 반영하는 reducer와 서버 표현 변환 함수를 소유
+// optimistic 적용 뒤 sender echo로 같은 payload가 다시 오므로 변화가 없으면 기존 배열 참조를 그대로 반환해야 함
+
 import type {
   CreateActivityRequest,
   CreateDayRequest,

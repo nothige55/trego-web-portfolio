@@ -1,3 +1,6 @@
+// 실시간 명령 실행과 undo/redo 히스토리를 잇는 지점
+// 실패하면 부분 재생 상태를 남기지 않도록 히스토리를 통째로 비움
+
 import { useCallback } from "react";
 
 import {
@@ -22,8 +25,6 @@ export type PlannerRecordedOperations = {
   readonly updatePath: (input: UpdatePathInput, previousInput: UpdatePathInput) => Promise<void>;
 };
 
-// 실시간 명령 실행과 undo/redo 히스토리를 잇는 지점이다.
-// 실패하면 부분 재생 상태를 남기지 않도록 히스토리를 통째로 비운다.
 export function usePlannerRecordedOperations(
   invokePlannerCommand: PlannerCommandInvoker,
 ): PlannerRecordedOperations {

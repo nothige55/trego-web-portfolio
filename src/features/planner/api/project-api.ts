@@ -1,3 +1,6 @@
+// 프로젝트 상세와 일정 노드를 REST로 조회하고 서버 응답을 PlannerNode 도메인 타입으로 정규화
+// 호출은 app 레이어의 프로젝트 데이터 로더가 맡음
+
 import { normalizeParentPathId } from "@/features/planner/realtime/planner-realtime-reducer";
 import type { PlannerNode } from "@/features/planner/types/planner-node";
 import type { PlannerProjectDetails } from "@/features/planner/types/planner-project";

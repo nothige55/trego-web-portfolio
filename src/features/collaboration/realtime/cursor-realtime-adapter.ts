@@ -1,3 +1,6 @@
+// 커서 Hub 계약(UpdateCursor, OnCursorUpdated)의 위치 인자를 객체 형태로 바꿔 주는 어댑터
+// controller는 Hub 메서드 이름과 인자 순서를 알지 않음
+
 import type {
   CursorUpdatedEvent,
   UpdateCursorCommand,

@@ -1,3 +1,6 @@
+// 일정 트리와 숨긴 Day·선택·hover 상태를 지도에 그릴 마커, Day 경로선, focus 대상으로 변환
+// mapbox-gl을 모르는 순수 함수라 지도 표시 규칙은 여기서 테스트
+
 import type {
   PlannerMapCoordinate,
   PlannerMapFocus,

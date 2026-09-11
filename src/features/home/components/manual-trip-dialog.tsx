@@ -1,3 +1,6 @@
+// 제목과 여행 기간을 받아 새 여행을 만드는 다이얼로그
+// 입력 상태와 검증은 useManualTripForm에 맡기고, 여기서는 열림 상태와 제출 흐름만 다룸
+
 import { CalendarDays, X } from "lucide-react";
 import { useState } from "react";
 

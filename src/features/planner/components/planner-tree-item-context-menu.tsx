@@ -1,3 +1,6 @@
+// 행 우클릭 메뉴. 열릴 때마다 색상 스트립을 현재 색 기준으로 되돌려야 하므로
+// 메뉴 내용만이 아니라 트리거를 포함한 ContextMenu 전체를 이 컴포넌트가 소유
+
 import { ChevronLeft, ChevronRight, Group, Pencil, Trash2 } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 import { useState } from "react";
@@ -22,8 +25,6 @@ function modulo(value: number, divisor: number): number {
   return ((value % divisor) + divisor) % divisor;
 }
 
-// 행 우클릭 메뉴다. 열릴 때마다 색상 스트립을 현재 색 기준으로 되돌려야 하므로
-// 메뉴 내용만이 아니라 트리거를 포함한 ContextMenu 전체를 이 컴포넌트가 소유한다.
 export function PlannerTreeItemContextMenu({
   node,
   commands,

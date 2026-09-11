@@ -1,3 +1,5 @@
+// Explore 패널이 보여 주는 목업 장소 한 건의 표시용 필드 타입
+
 export interface MockPlace {
   readonly id: string;
   readonly name: string;

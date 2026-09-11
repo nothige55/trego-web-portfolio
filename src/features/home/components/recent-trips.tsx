@@ -1,3 +1,6 @@
+// 최근 여행 카드 목록과 빈 상태를 보여 줌
+// 목록 제목 옆 동작(직접 만들기 등)은 headerAction으로 받아 이 파일이 다른 컴포넌트를 모르게 함
+
 import { ArrowUpRight, CalendarDays, MapPin } from "lucide-react";
 import type { ReactNode } from "react";
 

@@ -1,3 +1,6 @@
+// 스크롤 기준 행의 조상 경로를 목록 상단에 고정해 보여 주는 breadcrumb
+// 높이 상수는 usePlannerScheduleScroll이 기준 행을 고르는 경계선으로도 씀
+
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
 import type {
   FlattenedPlannerNode,
@@ -18,7 +21,7 @@ export function PlannerBreadcrumb({
   entityMap,
 }: PlannerBreadcrumbProps) {
   if (ancestors.length === 0) {
-    // 일정 헤더가 이 공간을 덮는다. 항상 같은 높이를 유지해 breadcrumb 전환 시 목록이 흔들리지 않는다.
+    // 일정 헤더가 이 공간을 덮음. 항상 같은 높이를 유지해 breadcrumb 전환 시 목록이 흔들리지 않음
     return (
       <div
         aria-hidden="true"

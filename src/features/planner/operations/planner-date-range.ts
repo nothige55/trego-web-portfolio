@@ -1,3 +1,6 @@
+// 여행 기간 변경과 Day 삭제를 redo/undo 커맨드로 만들어 Day 수와 여행 기간을 함께 맞춤
+// 기간을 바꾸면 Day를 늘리거나 줄이고 자동 이름을 다시 매기며, Day를 지우면 종료일을 당김
+
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import {

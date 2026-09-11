@@ -1,3 +1,5 @@
+// 기간을 줄이면 뒤쪽 Day와 그 안의 일정이 사라지므로 적용 전에 규모를 알림
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import type { PlannerDateRangeChangeSummary } from "@/features/planner/operations/planner-date-range";
 
-// 기간을 줄이면 뒤쪽 Day와 그 안의 일정이 사라지므로 적용 전에 규모를 알린다.
 export function PlannerDateRangeConfirmDialog({
   canConfirm,
   error,

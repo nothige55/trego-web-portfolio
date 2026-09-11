@@ -1,3 +1,6 @@
+// Planner Hub 명령 호출과 이벤트 구독을 묶는 adapter. SignalRClient 대신 최소 transport 인터페이스만 받음
+// 모든 명령은 요청을 먼저 로컬에 반영하고, 실패하면 오류를 알린 뒤 resync로 서버 상태에 맞춤
+
 import {
   normalizeProjectUpdated,
   reducePlannerHubEvent,

@@ -1,3 +1,6 @@
+// 보조 패널의 탭 전환과 접기 버튼을 담당
+// 활성 탭과 접힘 상태는 planner-view-store에 두어 지도 영역의 "패널 열기" 버튼과 공유
+
 import { ChevronLeft, Compass, MessageSquare } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -16,7 +19,7 @@ const modules: Array<{
   { value: "chat", label: "채팅", icon: MessageSquare },
 ];
 
-// app 계층에서 주입한 Chat UI와 아직 이식되지 않은 Explore placeholder를 전환한다.
+// app 계층에서 주입한 Chat UI와 아직 이식되지 않은 Explore placeholder를 전환
 type PlannerModulePanelProps = {
   readonly chatContent?: ReactNode;
   readonly exploreContent?: ReactNode;

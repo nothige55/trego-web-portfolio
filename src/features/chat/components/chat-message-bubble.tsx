@@ -1,3 +1,5 @@
+// 보낸 사람에 따라 좌우가 갈리는 말풍선 하나
+
 import type { ChatMessage } from "@/features/chat";
 
 function formatMessageTime(value: string): string {
@@ -11,7 +13,6 @@ function formatMessageTime(value: string): string {
       }).format(date);
 }
 
-// 보낸 사람에 따라 좌우가 갈리는 말풍선 하나다.
 export function ChatMessageBubble({
   isMine,
   message,

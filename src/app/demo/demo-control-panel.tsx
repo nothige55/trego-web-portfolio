@@ -1,3 +1,5 @@
+// 리뷰어가 링크를 열자마자 무엇이 시뮬레이션인지, 무엇을 눌러 볼 수 있는지 알 수 있게 하는 안내
+
 import { ChevronDown, Pause, Play, RotateCcw, Wifi, WifiOff } from "lucide-react";
 import { useState } from "react";
 
@@ -12,7 +14,6 @@ type DemoControlPanelProps = {
   readonly onReset: () => void;
 };
 
-// 리뷰어가 링크를 열자마자 무엇이 시뮬레이션인지, 무엇을 눌러 볼 수 있는지 알 수 있게 하는 안내다.
 export function DemoControlPanel({
   collaboratorName,
   isCollaboratorActive,

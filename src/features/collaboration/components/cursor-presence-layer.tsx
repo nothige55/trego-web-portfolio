@@ -1,3 +1,5 @@
+// 플래너 화면을 감싸 로컬 포인터 이동을 controller로 보내고, 원격 사용자 커서를 비율 좌표로 겹쳐 그림
+
 import { MousePointer2 } from "lucide-react";
 import { type PointerEvent, type ReactNode, useCallback, useSyncExternalStore } from "react";
 

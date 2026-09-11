@@ -1,3 +1,6 @@
+// 노드 아이콘과 이름을 한 줄로 그리는 라벨
+// 트리 행, breadcrumb, 루트 경계 라벨이 같은 아이콘·간격·타이포그래피를 사용
+
 import type { MouseEventHandler, ReactNode } from "react";
 
 import { PlannerNodeIcon } from "@/features/planner/components/planner-node-icons";
@@ -16,7 +19,6 @@ type PlannerNodeLabelProps = {
   readonly onDoubleClick?: MouseEventHandler<HTMLButtonElement>;
 };
 
-// 트리 행, breadcrumb, 루트 경계 라벨이 같은 아이콘·간격·타이포그래피를 사용한다.
 export function PlannerNodeLabel({
   node,
   parent,

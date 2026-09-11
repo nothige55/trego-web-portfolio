@@ -1,3 +1,6 @@
+// start → JoinProject → resync를 하나의 in-flight promise로 직렬화하는, React와 무관한 프로젝트 실시간 세션
+// reconnecting 뒤 connected로 돌아오면 join과 resync를 다시 실행
+
 import type { SignalRClient, SignalRConnectionStatus } from "@/lib/signalr-client";
 
 export interface ProjectRealtimeSessionSnapshot {

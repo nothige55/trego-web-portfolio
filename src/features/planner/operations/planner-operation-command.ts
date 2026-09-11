@@ -1,3 +1,6 @@
+// undo/redo 히스토리가 담는 Planner 커맨드 union과 이를 실시간 명령으로 실행하는 실행기를 정의
+// 삭제의 역커맨드는 지운 서브트리를 부모부터 다시 만드는 생성 커맨드 목록
+
 import type { PlannerRealtimeCommands } from "@/features/planner/realtime/planner-realtime";
 import type {
   CreateActivityInput,

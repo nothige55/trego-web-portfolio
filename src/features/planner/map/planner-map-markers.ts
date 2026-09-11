@@ -1,10 +1,11 @@
+// 지도 마커의 DOM 생성과 갱신을 담당. React 밖에서 mapbox-gl을 직접 조작하는 계층
+
 import mapboxgl, { type Map as MapboxMap } from "mapbox-gl";
 
 import type { PlannerMapMarker } from "@/features/planner/map/planner-map-model";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { PlannerNodePathId } from "@/features/planner/types/planner-node";
 
-// 지도 마커의 DOM 생성과 갱신을 담당한다. React 밖에서 mapbox-gl을 직접 조작하는 계층이다.
 export const MARKER_PIN_RADIUS = 16;
 
 export type RenderedMarker = {
@@ -49,9 +50,9 @@ function updateMarker(renderedMarker: RenderedMarker, markerModel: PlannerMapMar
   renderedMarker.pin.style.transform = isEmphasized ? "scale(1.35)" : "scale(1)";
 }
 
-// 마커 엘리먼트는 canvas container의 자식이라 마커 위 포인터 이동도 지도까지 전달된다.
+// 마커 엘리먼트는 canvas container의 자식이라 마커 위 포인터 이동도 지도까지 전달됨
 // 마커 아래에 경로선이 깔려 있으면 지도가 그 선을 hover로 잡아 마커 hover를 덮어쓰므로,
-// 마커를 가리키는 동안에는 경로선 hover를 건너뛰도록 현재 hover 중인 마커를 함께 추적한다.
+// 마커를 가리키는 동안에는 경로선 hover를 건너뛰도록 현재 hover 중인 마커를 함께 추적
 export type HoveredMarkerRef = { current: PlannerNodePathId | null };
 
 export function syncMarkers({
@@ -83,7 +84,7 @@ export function syncMarkers({
     if (!renderedMarker) {
       const markerElement = createMarkerElement();
       markerElement.element.addEventListener("click", (event) => {
-        // 마커 아래에 경로선이 깔려 있으면 지도 click까지 이어져 Day가 대신 선택된다.
+        // 마커 아래에 경로선이 깔려 있으면 지도 click까지 이어져 Day가 대신 선택됨
         event.stopPropagation();
         usePlannerViewStore.getState().activateItem(markerModel.pathId);
       });

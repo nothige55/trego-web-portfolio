@@ -1,3 +1,6 @@
+// 일정 트리의 행 하나를 그림
+// 선택·hover·드롭 상태 표현과 행 안에서 시작하는 편집만 담당하고, 편집 상태 자체는 패널이 소유
+
 import { useSortable } from "@dnd-kit/sortable";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { type ReactNode, useCallback } from "react";
@@ -36,8 +39,6 @@ function hasSelectedAncestor(
   return false;
 }
 
-// 일정 트리의 행 하나를 그린다.
-// 선택·hover·드롭 상태 표현과 행 안에서 시작하는 편집만 담당하고, 편집 상태 자체는 패널이 소유한다.
 export function PlannerTreeItem({
   node,
   dayNumber,
@@ -57,19 +58,19 @@ export function PlannerTreeItem({
 }: {
   readonly node: FlattenedPlannerNode;
   readonly dayNumber?: number;
-  // 렌더마다 새 함수가 오면 ref가 떨어졌다 붙어 dnd-kit이 droppable을 다시 잰다.
-  // pathId와 함께 부르는 고정 함수를 받아 이 안에서 안정된 콜백으로 묶는다.
+  // 렌더마다 새 함수가 오면 ref가 떨어졌다 붙어 dnd-kit이 droppable을 다시 잼
+  // pathId와 함께 부르는 고정 함수를 받아 이 안에서 안정된 콜백으로 묶음
   readonly registerItem: (pathId: PlannerNodePathId, element: HTMLDivElement | null) => void;
-  // 평상시 행 머리에 붙는 경로 정보 칸이다. 노드의 히트박스에는 들어가지 않는다.
-  // 드래그 중에는 레이아웃 높이만 지키는 빈 칸으로 남고, 내용은 dragRouteInfo가 그린다.
+  // 평상시 행 머리에 붙는 경로 정보 칸. 노드의 히트박스에는 들어가지 않음
+  // 드래그 중에는 레이아웃 높이만 지키는 빈 칸으로 남고, 내용은 dragRouteInfo가 그림
   readonly routeInfo?: ReactNode;
-  // 드래그 중 경로 정보다. 노드 박스 바로 위에 겹쳐 그려 노드와 함께 옮겨 가고,
-  // 레이아웃 높이에는 영향을 주지 않는다.
+  // 드래그 중 경로 정보. 노드 박스 바로 위에 겹쳐 그려 노드와 함께 옮겨 가고,
+  // 레이아웃 높이에는 영향을 주지 않음
   readonly dragRouteInfo?: ReactNode;
-  // 드래그 중 노드 박스를 옮길 거리다. 지금 놓았을 때의 배치에서 계산한다.
+  // 드래그 중 노드 박스를 옮길 거리. 지금 놓았을 때의 배치에서 계산
   readonly dragOffset: number;
   readonly boundaryAncestor?: FlattenedPlannerNode;
-  // 놓을 자리가 있을 때만 빈 자리를 표시한다. 목록 밖에서는 빠진 것처럼 보여야 한다.
+  // 놓을 자리가 있을 때만 빈 자리를 표시. 목록 밖에서는 빠진 것처럼 보여야 함
   readonly isDropTargetVisible: boolean;
   readonly isChildTarget: boolean;
   readonly isExpandingTarget: boolean;
@@ -90,36 +91,36 @@ export function PlannerTreeItem({
   const activateItem = usePlannerViewStore((state) => state.activateItem);
   const selectItem = usePlannerViewStore((state) => state.selectItem);
   const setHoveredItem = usePlannerViewStore((state) => state.setHoveredItem);
-  // 밀림은 dnd-kit의 정렬 전략이 아니라 패널이 계산한 dragOffset으로 그린다.
-  // 경로 정보 칸이 드래그 도중 생기거나 사라지는 걸 전략은 모르기 때문이다.
+  // 밀림은 dnd-kit의 정렬 전략이 아니라 패널이 계산한 dragOffset으로 그림
+  // 경로 정보 칸이 드래그 도중 생기거나 사라지는 걸 전략은 모르기 때문
   const { attributes, isDragging, listeners, setNodeRef } = useSortable({
     id: node.pathId,
     disabled: !isSortable,
   });
   const hasChildren = (childrenMap.get(node.pathId) ?? []).length > 0;
   const isExpanded = expandedIds.has(node.pathId);
-  // Shift 선택 중에는 정규화된 작업 대상만 강하게 표시한다. anchor는 범위 계산 기준으로만 남긴다.
+  // Shift 선택 중에는 정규화된 작업 대상만 강하게 표시. anchor는 범위 계산 기준으로만 남김
   const isSelected =
     multiSelectedIds.length > 0
       ? multiSelectedIds.includes(node.pathId)
       : selectedItemId === node.pathId;
-  // 선택 이후 펼쳐진 자손도 실제 작업 대상에 포함된다는 의미를 연한 배경으로 이어서 보여 준다.
+  // 선택 이후 펼쳐진 자손도 실제 작업 대상에 포함된다는 의미를 연한 배경으로 이어서 보여 줌
   const isSelectionContext =
     !isSelected &&
     (selectionRangeIds.includes(node.pathId) ||
       hasSelectedAncestor(node, multiSelectedIds, entityMap));
-  // 선택 상태는 유지하되 drag overlay와 중복 강조되지 않도록 목록 배경만 숨긴다.
+  // 선택 상태는 유지하되 drag overlay와 중복 강조되지 않도록 목록 배경만 숨김
   const isSelectedHighlightVisible = isSelected && !suppressSelectionHighlight;
   const isSelectionContextHighlightVisible = isSelectionContext && !suppressSelectionHighlight;
   const isMapHovered = hoveredItemId === node.pathId;
-  // 별도의 20px 토글 칸을 항상 유지해 자식 유무와 관계없이 라벨 시작점을 맞춘다.
+  // 별도의 20px 토글 칸을 항상 유지해 자식 유무와 관계없이 라벨 시작점을 맞춤
   const indentation = getPlannerRowIndentation(node.depth);
   const isEditingName = nameEditing.editingPathId === node.pathId;
   const canRename = node.kind === "folder" || node.kind === "day";
   const operationPathIds = multiSelectedIds.includes(node.pathId)
     ? multiSelectedIds
     : [node.pathId];
-  // 렌더마다 새 ref 함수가 가면 노드가 떨어졌다 붙어 dnd-kit이 droppable을 다시 잰다.
+  // 렌더마다 새 ref 함수가 가면 노드가 떨어졌다 붙어 dnd-kit이 droppable을 다시 잼
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
       setNodeRef(element);
@@ -139,7 +140,7 @@ export function PlannerTreeItem({
       className="list-none"
     >
       {routeInfo}
-      {/* 잡는 단위이자 충돌 rect다. 경로 정보를 뺀 라벨 + 메모만 여기에 들어간다. */}
+      {/* 잡는 단위이자 충돌 rect. 경로 정보를 뺀 라벨 + 메모만 여기에 들어감 */}
       <div
         ref={setRefs}
         {...listeners}
@@ -148,11 +149,11 @@ export function PlannerTreeItem({
           isSortable ? "cursor-grab active:cursor-grabbing" : "cursor-default"
         }`}
         style={{
-          // transform은 dnd-kit이 재는 이 요소에 직접 건다. 부모(li)에 걸면 다시 잴 때
-          // 그 이동량이 rect에 섞인다(ignoreTransform은 잰 요소 자신의 것만 되돌린다).
+          // transform은 dnd-kit이 재는 이 요소에 직접 걸어 둠. 부모(li)에 걸면 다시 잴 때
+          // 그 이동량이 rect에 섞임(ignoreTransform은 잰 요소 자신의 것만 되돌림)
           transform: dragOffset ? `translate3d(0, ${dragOffset}px, 0)` : undefined,
-          // 잡고 있는 동안에는 원래 자리를 비우되 높이는 유지한다.
-          // visibility는 상속되므로 아래 placeholder만 다시 켜서 빈 자리를 표시한다.
+          // 잡고 있는 동안에는 원래 자리를 비우되 높이는 유지
+          // visibility는 상속되므로 아래 placeholder만 다시 켜서 빈 자리를 표시
           visibility: isDragging ? "hidden" : undefined,
         }}
       >
@@ -261,7 +262,7 @@ export function PlannerTreeItem({
                 ? undefined
                 : (event) => {
                     if (event.shiftKey) {
-                      // 범위 선택은 선택 상태만 바꾸고 지도 카메라는 이동하지 않는다.
+                      // 범위 선택은 선택 상태만 바꾸고 지도 카메라는 이동하지 않음
                       selectItem(node.pathId, true);
                       return;
                     }

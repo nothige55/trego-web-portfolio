@@ -15,7 +15,7 @@ const namesOf = (rows: ReturnType<typeof rowsOf> | readonly { pathId: string }[]
   rows?.map((row) => row.pathId) ?? null;
 
 describe("buildPlannerDragVisualOrder", () => {
-  // 8월 12일만 펼친 상태로 화면에 그려진 행들이다.
+  // 8월 12일만 펼친 상태로 화면에 그려진 행들
   const rows = rowsOf(
     "day-one",
     "day-one-airport",
@@ -71,7 +71,7 @@ describe("buildPlannerDragVisualOrder", () => {
     ]);
   });
 
-  // 뒤따르는 형제가 없으면 부모 가지의 끝, 다음 Day 행 바로 앞이다.
+  // 뒤따르는 형제가 없으면 부모 가지의 끝, 다음 Day 행 바로 앞
   it("appends the held node at the end of its Day", () => {
     expect(orderFor("day-one-airport", { parentPathId: "day-one", siblingIndex: 3 })).toEqual([
       "day-one",
@@ -89,7 +89,7 @@ describe("buildPlannerDragVisualOrder", () => {
 });
 
 describe("calculatePlannerDragOffsets", () => {
-  // 메모가 달린 행은 높고, Day의 첫 장소는 경로 정보 칸이 없다.
+  // 메모가 달린 행은 높고, Day의 첫 장소는 경로 정보 칸이 없음
   const heights = new Map([
     ["day-one-airport", 64],
     ["day-one-iho", 36],
@@ -124,7 +124,7 @@ describe("calculatePlannerDragOffsets", () => {
     });
   });
 
-  // 첫 장소를 맨 뒤로: 두 번째 장소가 칸을 잃고, 옮겨 간 첫 장소가 칸을 얻는다.
+  // 첫 장소를 맨 뒤로: 두 번째 장소가 칸을 잃고, 옮겨 간 첫 장소가 칸을 얻음
   it("moves the route slot along with the first place of a Day", () => {
     expect(
       offsetsFor(

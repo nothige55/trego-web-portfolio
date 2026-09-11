@@ -1,3 +1,6 @@
+// Planner 화면이 부르는 REST 엔드포인트만 데모 서버의 기준 상태로 응답
+// axios adapter로 끼우므로 interceptor, 401 처리, response.data 추출은 운영 경로와 같음
+
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
 import type { DemoNetwork } from "@/app/demo/demo-network";
@@ -30,8 +33,6 @@ function toResponse(
   return { config, data, headers: {}, request: {}, status, statusText: String(status) };
 }
 
-// Planner 화면이 부르는 REST 엔드포인트만 데모 서버의 기준 상태로 응답한다.
-// axios adapter로 끼우므로 interceptor, 401 처리, response.data 추출은 운영 경로와 같다.
 export function createDemoRestClient({
   latencyMs = DEFAULT_LATENCY_MS,
   network,

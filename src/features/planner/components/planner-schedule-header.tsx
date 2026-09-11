@@ -1,10 +1,11 @@
+// 일정 패널 상단의 여행 정보 영역
+// 기간 편집 권한이 없으면 같은 자리에 읽기 전용 기간 배지를 둠
+
 import { PlannerDateRangePopover } from "@/features/planner/components/planner-date-range-popover";
 import type { PlannerDateRangeInput } from "@/features/planner/operations/planner-date-range";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { PlannerProjectDetails } from "@/features/planner/types/planner-project";
 
-// 일정 패널 상단의 여행 정보 영역이다.
-// 기간 편집 권한이 없으면 같은 자리에 읽기 전용 기간 배지를 둔다.
 export function PlannerScheduleHeader({
   projectDetails,
   onUpdateDateRange,

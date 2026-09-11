@@ -1,3 +1,6 @@
+// 여행 기간 버튼과 달력 popover, 기간 축소 확인 dialog를 한 묶음으로 배치
+// 입력과 확인 단계의 상태는 usePlannerDateRangeForm이 소유
+
 import { format, parseISO } from "date-fns";
 import { CalendarDays } from "lucide-react";
 

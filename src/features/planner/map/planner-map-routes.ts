@@ -1,3 +1,5 @@
+// Day 경로선 레이어의 생성과 갱신, 그리고 경로선 위에서 일어나는 hover/click 처리를 담당
+
 import type { GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
 
 import type { HoveredMarkerRef } from "@/features/planner/map/planner-map-markers";
@@ -5,7 +7,6 @@ import type { PlannerMapRoute } from "@/features/planner/map/planner-map-model";
 import type { PlannerRouteHoverProgress } from "@/features/planner/map/planner-route-hover-progress";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 
-// Day 경로선 레이어의 생성과 갱신, 그리고 경로선 위에서 일어나는 hover/click 처리를 담당한다.
 const ROUTE_SOURCE_ID = "planner-routes";
 const ROUTE_BORDER_LAYER_ID = "planner-route-borders";
 const ROUTE_LAYER_ID = "planner-route-lines";
@@ -117,8 +118,8 @@ export function addRouteLayers(map: MapboxMap, hoveredMarkerRef: HoveredMarkerRe
       "line-opacity": ["get", "opacity"],
     },
   });
-  // mouseenter가 아니라 mousemove를 듣는다. 마커에서 다시 선 위로 빠져나올 때
-  // 지도는 여전히 선 안에 있다고 보아 mouseenter를 다시 쏘지 않기 때문이다.
+  // mouseenter가 아니라 mousemove를 구독. 마커에서 다시 선 위로 빠져나올 때
+  // 지도는 여전히 선 안에 있다고 보아 mouseenter를 다시 쏘지 않기 때문
   map.on("mousemove", ROUTE_LAYER_ID, (event) => {
     map.getCanvas().style.cursor = "pointer";
     if (hoveredMarkerRef.current) {

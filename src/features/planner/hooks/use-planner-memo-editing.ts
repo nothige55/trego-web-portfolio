@@ -1,3 +1,6 @@
+// Activity 메모 편집 상태를 소유
+// 이름 편집과 달리 저장이 실패하면 초안을 유지하고 오류만 노출
+
 import { useCallback, useState } from "react";
 
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
@@ -17,8 +20,6 @@ export type PlannerMemoEditing = {
   readonly save: () => Promise<void>;
 };
 
-// Activity 메모 편집 상태를 소유한다.
-// 이름 편집과 달리 저장이 실패하면 초안을 유지하고 오류만 노출한다.
 export function usePlannerMemoEditing(commands?: PlannerNodeEditingCommands): PlannerMemoEditing {
   const entityMap = usePlannerViewStore((state) => state.tree.entityMap);
   const [editingPathId, setEditingPathId] = useState<PlannerNodePathId | null>(null);

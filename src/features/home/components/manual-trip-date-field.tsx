@@ -1,3 +1,6 @@
+// 새 여행 다이얼로그에서 날짜 하나를 팝오버 달력으로 고르는 입력 칸
+// 열림·오류 상태는 useManualTripForm이 소유하고 이 칸은 표시만 함
+
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { ChevronDown } from "lucide-react";
@@ -14,7 +17,7 @@ function formatDateLabel(date: Date): string {
   return format(date, "yyyy. M. d.", { locale: ko });
 }
 
-// 시작일·종료일 칸은 선택 규칙만 다르고 생김새가 같아 한 컴포넌트로 둔다.
+// 시작일·종료일 칸은 선택 규칙만 다르고 생김새가 같아 한 컴포넌트로 둠
 export function ManualTripDateField({
   label,
   value,

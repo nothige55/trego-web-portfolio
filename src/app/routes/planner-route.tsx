@@ -1,11 +1,12 @@
+// planner URL에서 projectId를 읽고, 인증 상태에 따라 로그인 화면이나 실시간 planner 페이지로 분기
+// URL의 projectTitle은 기존 링크 호환용이라 읽지 않음
+
 import { useParams } from "react-router";
 
 import { useAuth } from "@/app/auth/auth-context";
 import { ProjectPlannerPage } from "@/app/realtime/project-planner-page";
 import { AuthScreen } from "@/features/auth/components/auth-screen";
 
-// app route는 URL 해석과 feature 조합만 담당한다.
-// projectTitle은 기존 URL 호환용이며, fixture 단계의 화면 데이터로 사용하지 않는다.
 export function PlannerRoute() {
   const { projectId = "demo" } = useParams();
   const { client, isSubmitting, login, register, session, status } = useAuth();

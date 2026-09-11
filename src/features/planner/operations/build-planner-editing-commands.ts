@@ -1,3 +1,6 @@
+// 일정 패널에 주입할 PlannerNodeEditingCommands 구현을 만듦. app 레이어가 실행기를 넣어 한 번 생성
+// 역커맨드는 명령을 호출하는 시점의 planner-view-store 스냅샷으로 계산
+
 import { addDays, format, parseISO } from "date-fns";
 
 import {
@@ -21,8 +24,8 @@ import type {
 const FALLBACK_DAY_COLOR = "#F44336";
 const MISSING_DATE_RANGE_MESSAGE = "여행 날짜 정보를 불러오지 못했습니다.";
 
-// UI가 호출하는 편집 동작을 redo/undo 커맨드 쌍으로 번역한다.
-// 실행과 히스토리 적재는 주입받은 실행기가 맡으므로 여기에는 React도 통신도 없다.
+// UI가 호출하는 편집 동작을 redo/undo 커맨드 쌍으로 번역
+// 실행과 히스토리 적재는 주입받은 실행기가 맡으므로 여기에는 React도 통신도 없음
 export function createPlannerEditingCommands({
   replayHistory,
   runRecordedOperation,

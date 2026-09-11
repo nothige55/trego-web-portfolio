@@ -1,7 +1,8 @@
+// 일정 데이터가 준비되기 전 화면
+// 오류가 있으면 원인과 함께 연결 상태를 보여 주고, 없으면 적재 중임을 알림
+
 import { ProjectRealtimeStatusBanner } from "@/app/realtime/project-realtime-provider";
 
-// 일정 데이터가 준비되기 전 화면이다.
-// 오류가 있으면 원인과 함께 연결 상태를 보여 주고, 없으면 적재 중임을 알린다.
 export function ProjectPlannerFallbackScreen({ error }: { readonly error: Error | null }) {
   return (
     <main className="flex min-h-svh items-center justify-center bg-[#f6f6f7] p-6">

@@ -1,3 +1,6 @@
+// Planner 노드의 folder | day | activity 판별 union과 트리 파생 구조 타입을 정의
+// pathId는 트리 식별자이고 id는 서버 엔터티 ID로 서로 다르며, 루트의 parentPathId는 null
+
 interface PlannerNodeBase {
   readonly id: string;
   readonly name: string;

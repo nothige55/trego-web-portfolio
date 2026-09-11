@@ -1,3 +1,6 @@
+// 홈 화면의 여행 프롬프트 입력과 최근 여행 목록, 직접 만들기 진입점을 배치
+// 프로젝트 조회·생성과 로그인 처리는 app 라우트가 콜백으로 맡음
+
 import { ArrowUp } from "lucide-react";
 import { useState } from "react";
 

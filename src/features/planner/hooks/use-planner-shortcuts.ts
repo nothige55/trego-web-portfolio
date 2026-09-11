@@ -1,3 +1,6 @@
+// 일정 패널 전역 단축키를 window에 붙임
+// 트리에 포커스가 없어도 동작해야 하므로 요소 단위 핸들러 대신 window 리스너를 씀
+
 import { useEffect } from "react";
 
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
@@ -12,8 +15,6 @@ function isTextInputTarget(target: EventTarget | null): boolean {
   );
 }
 
-// 일정 패널 전역 단축키를 window에 붙인다.
-// 트리에 포커스가 없어도 동작해야 하므로 요소 단위 핸들러 대신 window 리스너를 쓴다.
 export function usePlannerShortcuts({
   commands,
   operationPathIds,

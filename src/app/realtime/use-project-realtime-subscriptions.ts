@@ -1,3 +1,6 @@
+// 하나의 SignalR 연결 위에 planner·chat·cursor presence 구독을 함께 얹음
+// 여러 feature를 묶는 지점이라 app 레이어에 두고, 각 Hub 계약은 feature의 realtime 모듈이 소유
+
 import { useCallback, useRef, useState } from "react";
 
 import type { AuthSession } from "@/features/auth/types";
@@ -24,8 +27,6 @@ export type ProjectRealtimeSubscriptions = {
   readonly registerSubscriptions: (client: SignalRClient) => () => void;
 };
 
-// 하나의 SignalR 연결 위에 planner·chat·cursor presence 구독을 함께 얹는다.
-// 여러 feature를 묶는 지점이라 app 레이어에 두고, 각 Hub 계약은 feature의 realtime 모듈이 소유한다.
 export function useProjectRealtimeSubscriptions({
   identity,
   projectId,
@@ -92,7 +93,7 @@ export function useProjectRealtimeSubscriptions({
       try {
         await invoke(commands);
       } catch (error) {
-        // adapter의 canonical resync가 끝난 뒤에도 사용자가 실패 원인을 확인할 수 있게 남긴다.
+        // adapter의 canonical resync가 끝난 뒤에도 사용자가 실패 원인을 확인할 수 있게 남김
         reportError(toError(error));
         throw error;
       }

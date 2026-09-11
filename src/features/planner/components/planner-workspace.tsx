@@ -1,3 +1,6 @@
+// Planner route의 최상위 조합 컴포넌트
+// 일정, 보조 모듈, 지도 영역을 배치하되 각 영역의 세부 동작은 하위 컴포넌트가 소유
+
 import { lazy, type ReactNode, Suspense } from "react";
 
 import { PlannerModulePanel } from "@/features/planner/components/planner-module-panel";
@@ -37,8 +40,6 @@ function PlannerMapModuleLoading() {
   );
 }
 
-// Planner route의 최상위 조합 컴포넌트다.
-// 일정, 보조 모듈, 지도 영역을 배치하되 각 영역의 세부 동작은 하위 컴포넌트가 소유한다.
 export function PlannerWorkspace({
   chatContent,
   exploreContent,
@@ -60,7 +61,7 @@ export function PlannerWorkspace({
         isNodeMoveEnabled={isNodeMoveEnabled}
         onMoveNode={onMoveNode}
       />
-      {/* 접힌 패널은 DOM에서도 제거해 남은 공간을 지도 영역이 모두 사용하게 한다. */}
+      {/* 접힌 패널은 DOM에서도 제거해 남은 공간을 지도 영역이 모두 사용하게 함 */}
       {isModuleCollapsed ? null : (
         <PlannerModulePanel chatContent={chatContent} exploreContent={exploreContent} />
       )}

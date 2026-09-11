@@ -1,3 +1,6 @@
+// 보이는 행 순서에서 over 행과 가로 이동량을 드롭 요청(부모 + 형제 index)으로 해석
+// 허용 여부와 position은 planner-drop-rules에 맡기고, 잡은 노드의 자손을 목록에서 빼는 보조 계산도 둠
+
 import { arrayMove } from "@dnd-kit/sortable";
 
 import {
@@ -128,7 +131,7 @@ function collectTrailingCandidates(
 
 /**
  * 기존 Planner처럼 이동 방향에 따라 active 행의 leading edge가 over 행에 닿았을 때만
- * 컨테이너 child hover로 본다. 단순히 collision 대상이 같다는 이유로 자식 드롭을 열지 않는다.
+ * 컨테이너 child hover로 봄. 단순히 collision 대상이 같다는 이유로 자식 드롭을 열지 않음
  */
 export function isPlannerChildHover({
   overTop,
@@ -210,7 +213,7 @@ export function resolvePlannerDrop({
     return rejection("parent-not-found");
   }
 
-  // 같은 계층의 두 행 사이는 오직 두 행의 공통 부모 아래 형제 위치로 해석한다.
+  // 같은 계층의 두 행 사이는 오직 두 행의 공통 부모 아래 형제 위치로 해석
   if (nextItem && previousItem.depth === nextItem.depth) {
     return calculateSiblingDestination(
       tree,
@@ -223,7 +226,7 @@ export function resolvePlannerDrop({
     );
   }
 
-  // 부모 행과 첫 자식 사이는 next 행의 바로 앞 형제 위치다. 자식 drop은 hover 타이머가 별도로 맡는다.
+  // 부모 행과 첫 자식 사이는 next 행의 바로 앞 형제 위치. 자식 drop은 hover 타이머가 별도로 맡음
   if (nextItem && previousItem.depth < nextItem.depth) {
     return calculateSiblingDestination(
       tree,
@@ -236,8 +239,8 @@ export function resolvePlannerDrop({
     );
   }
 
-  // 기존 Planner는 activity의 trailing drop 계층을 인접 activity와 동일하게 고정한다.
-  // 따라서 group의 마지막 자식 뒤에서 X축 이동이 없을 때 상위 Day로 빠지지 않는다.
+  // 기존 Planner는 activity의 trailing drop 계층을 인접 activity와 동일하게 고정
+  // 따라서 group의 마지막 자식 뒤에서 X축 이동이 없을 때 상위 Day로 빠지지 않음
   if (activeNode.kind === "activity") {
     if (previousItem.kind === "activity" && previousItem.parentPathId) {
       return calculateSiblingDestination(
@@ -262,8 +265,8 @@ export function resolvePlannerDrop({
     return rejection("parent-not-found");
   }
 
-  // branch 끝에서는 이전 행과 그 조상들의 "다음 형제"만 후보로 삼고 X축으로 계층을 고른다.
-  // 이전 구현처럼 임의의 더 깊은 부모를 만들어 컨테이너 안으로 즉시 중첩시키지 않는다.
+  // branch 끝에서는 이전 행과 그 조상들의 "다음 형제"만 후보로 삼고 X축으로 계층을 고름
+  // 이전 구현처럼 임의의 더 깊은 부모를 만들어 컨테이너 안으로 즉시 중첩시키지 않음
   const requestedDepth = activeNode.depth + Math.round(horizontalOffset / INDENTATION_WIDTH);
   const candidates = collectTrailingCandidates(tree, previousItem, activePathId).sort(
     (first, second) =>

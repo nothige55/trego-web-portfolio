@@ -1,3 +1,6 @@
+// 채팅 Hub 계약(메서드·이벤트 이름, 요청 payload 변환)과 구독·전송 명령을 소유
+// 전송은 메시지를 낙관적으로 추가하지 않고 결과와 원문 draft만 돌려줌
+
 import type {
   ChatMessageDraft,
   OnMessageReceivedHubEvent,

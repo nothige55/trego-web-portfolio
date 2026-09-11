@@ -1,3 +1,6 @@
+// VITE_ 환경변수를 검증·정규화해 앱이 쓰는 env 객체로 제공
+// SignalR Hub URL은 명시값, REST API origin, 로컬 /project 순으로 결정
+
 const HTTP_PROTOCOLS = new Set(["http:", "https:"]);
 const DEFAULT_SIGNALR_HUB_PATH = "/project";
 

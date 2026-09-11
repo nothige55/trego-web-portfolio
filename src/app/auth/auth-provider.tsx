@@ -1,3 +1,6 @@
+// access token을 sessionStorage에 보관하고, 토큰이 주입된 ApiClient와 현재 회원 세션을 context로 내려줌
+// 401 응답이나 회원 조회 실패 시 세션을 비움
+
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AuthContext } from "@/app/auth/auth-context";

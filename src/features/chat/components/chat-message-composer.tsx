@@ -1,11 +1,12 @@
+// 입력 초안과 전송 결과를 소유
+// 실패해도 초안을 지우지 않고 오류만 남겨 사용자가 그대로 다시 보낼 수 있게 함
+
 import { Send } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { SendChatMessageResult } from "@/features/chat";
 
-// 입력 초안과 전송 결과를 소유한다.
-// 실패해도 초안을 지우지 않고 오류만 남겨 사용자가 그대로 다시 보낼 수 있게 한다.
 export function ChatMessageComposer({
   isReady,
   onSend,

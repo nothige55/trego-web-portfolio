@@ -1,3 +1,6 @@
+// 채팅 패널의 멤버 추가 영역에 들어가는 초대 폼
+// 이메일·권한 입력과 요청 상태를 스스로 소유하고, 인증된 client만 app에서 주입받음
+
 import { type FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui/button";

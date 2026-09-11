@@ -1,3 +1,6 @@
+// 서버에 별도 접속자로 참여하는 가상의 동료
+// 사용자 탭을 거치지 않고 Hub 명령을 보내므로, 화면에는 실제 원격 변경과 같은 경로로 도착
+
 import type { DemoProjectServer, DemoServerConnection } from "@/app/demo/demo-project-server";
 import type { DemoMember } from "@/app/demo/demo-seed";
 import { simulateLatency } from "@/app/demo/simulate-latency";
@@ -14,7 +17,7 @@ const DEFAULT_HOLD_RETRY_MS = 1_000;
 const DEFAULT_CHAT_DELAY_MS = 1_500;
 const DEFAULT_CURSOR_INTERVAL_MS = 100;
 
-// 커서는 일정 목록 쪽을 천천히 돌아다닌다. 좌표는 Planner 영역 기준 비율이다.
+// 커서는 일정 목록 쪽을 천천히 돌아다님. 좌표는 Planner 영역 기준 비율
 const CURSOR_AREA = { minX: 0.08, maxX: 0.42, minY: 0.2, maxY: 0.85 } as const;
 const CURSOR_EASING = 0.12;
 
@@ -38,7 +41,7 @@ export interface DemoCollaborator {
   stop: () => void;
 }
 
-// null은 조건이 맞지 않아 건너뛴 단계, 객체는 실행한 단계다.
+// null은 조건이 맞지 않아 건너뛴 단계, 객체는 실행한 단계
 type StepResult = { readonly chat?: string } | null;
 
 type StepContext = {
@@ -62,7 +65,7 @@ function isActivity(node: PlannerNode | null): node is PlannerActivityNode {
   return node?.kind === "activity";
 }
 
-// 이름·메모·순서를 원래 값과 번갈아 바꾸는 토글로만 구성해, 반복해도 일정이 불어나지 않게 한다.
+// 이름·메모·순서를 원래 값과 번갈아 바꾸는 토글로만 구성해, 반복해도 일정이 불어나지 않게 함
 function createScript(): readonly Step[] {
   const originalNames = new Map<string, string>();
   const originalMemos = new Map<string, string | null>();
@@ -169,8 +172,6 @@ function createScript(): readonly Step[] {
   ];
 }
 
-// 서버에 별도 접속자로 참여하는 가상의 동료다.
-// 사용자 탭을 거치지 않고 Hub 명령을 보내므로, 화면에는 실제 원격 변경과 같은 경로로 도착한다.
 export function createDemoCollaborator({
   actionIntervalMs = DEFAULT_ACTION_INTERVAL_MS,
   canTouch,

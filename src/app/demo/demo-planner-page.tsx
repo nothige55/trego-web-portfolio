@@ -1,3 +1,5 @@
+// 운영과 같은 ProjectPlannerPage에 브라우저 안의 서버를 주입. feature 코드에는 데모 분기가 없음
+
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { createDemoCollaborator } from "@/app/demo/demo-collaborator";
@@ -18,13 +20,13 @@ import { ProjectPlannerPage } from "@/app/realtime/project-planner-page";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { PlannerNode } from "@/features/planner/types/planner-node";
 
-// 사용자가 고르고 있는 노드는 동료가 건드리지 않는다. 편집을 가로채면 데모가 방해가 된다.
+// 사용자가 고르고 있는 노드는 동료가 건드리지 않음. 편집을 가로채면 데모가 방해가 됨
 function isUntouchedByUser(node: PlannerNode): boolean {
   const { multiSelectedIds, selectedItemId } = usePlannerViewStore.getState();
   return node.pathId !== selectedItemId && !multiSelectedIds.includes(node.pathId);
 }
 
-// 첫 화면에서 동료가 편집하는 날짜가 클릭 없이 보이도록, 일정이 처음 적재되면 한 번만 펼친다.
+// 첫 화면에서 동료가 편집하는 날짜가 클릭 없이 보이도록, 일정이 처음 적재되면 한 번만 펼침
 function expandInitialNodesOnLoad(): () => void {
   let isExpanded = false;
   const unsubscribe = usePlannerViewStore.subscribe(({ expandNode, tree }) => {
@@ -40,7 +42,7 @@ function expandInitialNodesOnLoad(): () => void {
   return unsubscribe;
 }
 
-// 드래그 중에 원격 변경이 끼어들면 드롭 위치가 흔들리므로, 누르고 있는 동안은 동료가 기다린다.
+// 드래그 중에 원격 변경이 끼어들면 드롭 위치가 흔들리므로, 누르고 있는 동안은 동료가 기다림
 function createPointerPressTracker() {
   let isPressed = false;
   const handlePointerDown = () => {
@@ -85,7 +87,6 @@ function createDemoEnvironment() {
   };
 }
 
-// 운영과 같은 ProjectPlannerPage에 브라우저 안의 서버를 주입한다. feature 코드에는 데모 분기가 없다.
 export function DemoPlannerPage() {
   const [sessionKey, setSessionKey] = useState(0);
 

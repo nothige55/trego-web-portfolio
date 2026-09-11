@@ -1,3 +1,6 @@
+// 채팅 영역의 배치와 멤버 추가 영역의 열림 상태를 담당
+// 목록·입력창은 각자 상태를 소유하고, 이 컴포넌트는 정렬된 메시지와 스크롤 추종만 이어 줌
+
 import { UserPlus } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 
@@ -18,8 +21,6 @@ type RealtimeChatPanelProps = {
   readonly onSend: (content: string) => Promise<SendChatMessageResult>;
 };
 
-// 채팅 영역의 배치만 담당한다.
-// 목록·입력창은 각자 상태를 소유하고, 이 컴포넌트는 정렬된 메시지와 스크롤 추종만 이어 준다.
 export function RealtimeChatPanel({
   currentUserId,
   currentUserName,

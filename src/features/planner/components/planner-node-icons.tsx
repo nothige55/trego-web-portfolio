@@ -1,3 +1,6 @@
+// 일정 목록에 쓰는 노드 아이콘(Day 달력, 폴더, 장소 번호 핀)의 SVG를 그림
+// 지도 위 마커는 이 파일이 아니라 planner/map의 DOM 마커가 따로 그림
+
 import { Heart } from "lucide-react";
 
 import type { FlattenedPlannerNode } from "@/features/planner/types/planner-node";
@@ -130,7 +133,7 @@ type PlannerNodeIconProps = IconSizeProps & {
   readonly parent?: FlattenedPlannerNode;
 };
 
-// 일정 행과 breadcrumb가 같은 도메인 아이콘 규칙을 공유하도록 노드별 조합을 한곳에 둔다.
+// 일정 행과 breadcrumb가 같은 도메인 아이콘 규칙을 공유하도록 노드별 조합을 한곳에 둠
 export function PlannerNodeIcon({ node, dayNumber, parent, size = 16 }: PlannerNodeIconProps) {
   if (node.kind === "folder") {
     if (node.folderType === "wish") {

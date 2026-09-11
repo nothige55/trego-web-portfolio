@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { demoPlannerProject } from "@/features/planner/data/demo-planner";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 
-// 전역 Zustand 인스턴스가 테스트 사이에 상태를 공유하지 않도록 매 테스트 전에 reset한다.
+// 전역 Zustand 인스턴스가 테스트 사이에 상태를 공유하지 않도록 매 테스트 전에 reset
 describe("usePlannerViewStore", () => {
   beforeEach(() => {
     usePlannerViewStore.getState().reset();

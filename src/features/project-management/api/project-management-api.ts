@@ -1,3 +1,6 @@
+// 프로젝트 목록·생성·멤버 추가 REST 요청을 담당
+// 기본 client를 두지 않아 호출부가 인증된 client를 넘겨야 함
+
 import type {
   CreateProjectInput,
   ProjectMemberRole,

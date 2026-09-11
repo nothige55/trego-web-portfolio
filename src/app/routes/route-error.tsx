@@ -1,3 +1,5 @@
+// route 렌더링 중 발생한 오류를 보여 주는 화면이며, 예외 메시지 원문은 개발 모드에서만 노출
+
 import { isRouteErrorResponse, Link, useRouteError } from "react-router";
 
 export function RouteError() {

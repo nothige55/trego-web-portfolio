@@ -1,3 +1,6 @@
+// 일정 추가·그룹화·다중 선택 작업에 넘길 Hub 입력을 현재 노드 목록에서 계산하는 순수 함수 모음
+// 이 입력을 redo/undo 커맨드 쌍으로 묶는 일은 build-planner-editing-commands가 맡음
+
 import type {
   CreateActivityInput,
   CreateDayInput,

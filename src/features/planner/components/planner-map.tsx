@@ -1,3 +1,6 @@
+// 지도 영역의 화면 상태만 담당
+// mapbox-gl 인스턴스와 마커·경로 갱신은 usePlannerMapInstance와 planner/map 모듈이 소유
+
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import { ChevronRight, MapPinned, Scan } from "lucide-react";
@@ -7,8 +10,6 @@ import { env } from "@/config/env";
 import { usePlannerMapInstance } from "@/features/planner/hooks/use-planner-map-instance";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 
-// 지도 영역의 화면 상태만 담당한다.
-// mapbox-gl 인스턴스와 마커·경로 갱신은 usePlannerMapInstance와 planner/map 모듈이 소유한다.
 export function PlannerMap({ accessToken }: { readonly accessToken?: string | null }) {
   const isModuleCollapsed = usePlannerViewStore((state) => state.isModuleCollapsed);
   const setModuleCollapsed = usePlannerViewStore((state) => state.setModuleCollapsed);

@@ -1,3 +1,6 @@
+// 기간 선택 popover의 상태를 소유
+// Day가 사라지는 변경만 확인 단계를 거치므로 적용 대기 입력을 따로 붙들고 있음
+
 import { format, parseISO } from "date-fns";
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
@@ -44,8 +47,6 @@ export type PlannerDateRangeForm = {
   readonly setOpen: (isOpen: boolean) => void;
 };
 
-// 기간 선택 popover의 상태를 소유한다.
-// Day가 사라지는 변경만 확인 단계를 거치므로 적용 대기 입력을 따로 붙들고 있는다.
 export function usePlannerDateRangeForm({
   nodes,
   onUpdate,

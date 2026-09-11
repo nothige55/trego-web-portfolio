@@ -1,3 +1,6 @@
+// planner·chat·collaboration을 하나의 실시간 세션 위에서 묶는 유일한 지점
+// 데이터 적재, 구독 등록, 편집 명령 조립은 각각 hook과 feature 모듈이 소유하고 여기서는 배선만 함
+
 import { useCallback, useMemo, useState } from "react";
 
 import { ProjectPlannerFallbackScreen } from "@/app/realtime/project-planner-fallback-screen";
@@ -40,8 +43,6 @@ type ProjectPlannerPageProps = {
   readonly restClient?: ApiClient;
 };
 
-// planner·chat·collaboration을 하나의 실시간 세션 위에서 묶는 유일한 지점이다.
-// 데이터 적재, 구독 등록, 편집 명령 조립은 각각 hook과 feature 모듈이 소유하고 여기서는 배선만 한다.
 export function ProjectPlannerPage({
   clientFactory,
   identity,

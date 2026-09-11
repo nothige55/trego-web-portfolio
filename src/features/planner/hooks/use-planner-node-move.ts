@@ -1,3 +1,6 @@
+// 드래그로 확정된 이동을 낙관적으로 먼저 반영하고 서버 확인을 기다림
+// 이동이 겹치면 되돌릴 기준 위치가 흔들리므로 한 번에 하나만 처리
+
 import { useCallback, useRef, useState } from "react";
 
 import type { UpdatePathInput } from "@/features/planner/realtime/project-hub-planner-contracts";
@@ -9,8 +12,6 @@ export type PlannerNodeMove = {
   readonly moveNode: PlannerNodeMoveHandler;
 };
 
-// 드래그로 확정된 이동을 낙관적으로 먼저 반영하고 서버 확인을 기다린다.
-// 이동이 겹치면 되돌릴 기준 위치가 흔들리므로 한 번에 하나만 처리한다.
 export function usePlannerNodeMove({
   isEnabled,
   updatePath,
