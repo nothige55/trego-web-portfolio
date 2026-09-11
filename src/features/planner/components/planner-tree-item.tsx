@@ -94,6 +94,7 @@ export function PlannerTreeItem({
   const isSelected = selectionState === "selected";
   const isMapHovered = hoveredItemId === node.pathId;
   // 선택 상태는 유지하되 drag overlay와 중복 강조되지 않도록 목록 배경만 숨김
+  // 라벨과 메모가 같은 값을 써서 한 노드가 한 톤으로 보이게 함
   const highlight = getPlannerRowHighlight({
     selectionState,
     isMapHovered,
@@ -136,6 +137,14 @@ export function PlannerTreeItem({
         className={`relative touch-none ${
           isSortable ? "cursor-grab active:cursor-grabbing" : "cursor-default"
         }`}
+        // 지도와 공유하는 hover는 라벨이 아니라 노드 박스 전체에서 받음
+        // 라벨에서만 받으면 같은 톤으로 칠해진 메모로 내려가는 순간 강조가 풀림
+        onPointerEnter={() => setHoveredItem(node.pathId)}
+        onPointerLeave={() => {
+          if (usePlannerViewStore.getState().hoveredItemId === node.pathId) {
+            setHoveredItem(null);
+          }
+        }}
         style={{
           // transform은 dnd-kit이 재는 이 요소에 직접 걸어 둠. 부모(li)에 걸면 다시 잴 때
           // 그 이동량이 rect에 섞임(ignoreTransform은 잰 요소 자신의 것만 되돌림)
@@ -192,12 +201,6 @@ export function PlannerTreeItem({
                     : `${getPlannerRowHighlightClassName(highlight)} ${labelHoverClassName}`
               }`}
               style={{ paddingLeft: indentation }}
-              onPointerEnter={() => setHoveredItem(node.pathId)}
-              onPointerLeave={() => {
-                if (usePlannerViewStore.getState().hoveredItemId === node.pathId) {
-                  setHoveredItem(null);
-                }
-              }}
             />
           }
         >
@@ -279,11 +282,7 @@ export function PlannerTreeItem({
             indentation={indentation}
             editing={memoEditing}
             commands={commands}
-            className={
-              highlight === "selected"
-                ? "border-brand bg-brand/5"
-                : getPlannerRowHighlightClassName(highlight === "range" ? highlight : null)
-            }
+            className={getPlannerRowHighlightClassName(highlight)}
           />
         ) : null}
       </div>
