@@ -41,6 +41,10 @@ import {
 import { buildPlannerDragProjection } from "@/features/planner/utils/build-planner-drag-projection";
 import { getPlannerBreadcrumbAncestors } from "@/features/planner/utils/get-planner-breadcrumb-ancestors";
 import { getPlannerRowAdornments } from "@/features/planner/utils/get-planner-row-adornments";
+import {
+  getPlannerRouteHighlight,
+  getPlannerSelectionState,
+} from "@/features/planner/utils/get-planner-row-highlight";
 import { getPlannerRowIndentation } from "@/features/planner/utils/get-planner-row-indentation";
 import { getVisiblePlannerNodes } from "@/features/planner/utils/get-visible-planner-nodes";
 
@@ -60,6 +64,7 @@ export function PlannerSchedulePanel({
   const rootPathId = usePlannerViewStore((state) => state.rootPathId);
   const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
   const multiSelectedIds = usePlannerViewStore((state) => state.multiSelectedIds);
+  const selectionRangeIds = usePlannerViewStore((state) => state.selectionRangeIds);
   const expandedIds = usePlannerViewStore((state) => state.expandedIds);
   const clearSelection = usePlannerViewStore((state) => state.clearSelection);
   const expandNode = usePlannerViewStore((state) => state.expandNode);
@@ -112,6 +117,7 @@ export function PlannerSchedulePanel({
     () => buildPlannerDayNumbers(tree.flattenedItems, projectDetails?.startDate),
     [projectDetails?.startDate, tree.flattenedItems],
   );
+  const selection = { selectedItemId, multiSelectedIds, selectionRangeIds };
   const operationPathIds = useMemo(
     () => (multiSelectedIds.length > 0 ? multiSelectedIds : selectedItemId ? [selectedItemId] : []),
     [multiSelectedIds, selectedItemId],
@@ -352,6 +358,14 @@ export function PlannerSchedulePanel({
                   const isDraggingList = activePathId !== null;
                   // 목록에서 빠진 잡은 노드는 보일 배치에 없음. 그 행에는 아무것도 그리지 않음
                   const isInVisibleLayout = !dragOffsets || dragOffsets.has(node.pathId);
+                  // 평상시 경로 정보에만 씀. 드래그 중에는 선택 강조를 끄고 dragRouteInfo가 그림
+                  const routeHighlight =
+                    !isDraggingList && previousActivity
+                      ? getPlannerRouteHighlight(
+                          getPlannerSelectionState(previousActivity, selection, tree.entityMap),
+                          getPlannerSelectionState(node, selection, tree.entityMap),
+                        )
+                      : null;
 
                   return (
                     <PlannerTreeItem
@@ -370,6 +384,7 @@ export function PlannerSchedulePanel({
                                 activity={node}
                                 previousActivity={previousActivity}
                                 indentation={getPlannerRowIndentation(node.depth)}
+                                highlight={routeHighlight}
                               />
                             ) : null}
                           </div>

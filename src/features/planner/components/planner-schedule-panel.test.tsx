@@ -345,6 +345,14 @@ describe("PlannerSchedulePanel", () => {
     expect(usePlannerViewStore.getState().hoveredItemId).toBeNull();
     expect(airportItem).not.toHaveAttribute("data-map-highlight");
 
+    // 메모도 같은 노드라 hover를 받고, 라벨과 같은 톤으로 칠해짐
+    const airportMemo = within(tree).getByText("렌터카 픽업").closest("[class*='border-l-2']");
+    fireEvent.pointerEnter(airportMemo!);
+    expect(airportItem).toHaveAttribute("data-map-highlight", "hovered");
+    expect(airportMemo).toHaveClass("border-brand/70", "bg-brand/10");
+    fireEvent.pointerLeave(airportMemo!);
+    expect(airportItem).not.toHaveAttribute("data-map-highlight");
+
     expect(screen.getByTestId("planner-route-day-one-iho")).toHaveTextContent(
       "3.9km·자동차 15분길찾기",
     );
@@ -472,7 +480,7 @@ describe("PlannerSchedulePanel", () => {
     ).toHaveAccessibleName("제주국제공항에서 애월 해안도로까지 길찾기");
   });
 
-  it("extends the selection highlight from the label to its memo", async () => {
+  it("paints a selected place's memo in the same tone as its label", async () => {
     const user = userEvent.setup();
     usePlannerViewStore.getState().load(demoPlannerProject.nodes);
     usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
@@ -481,16 +489,75 @@ describe("PlannerSchedulePanel", () => {
 
     await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
     await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
-    const memo = within(tree).getByText("카페에서 잠시 쉬기");
-    expect(memo.closest("[class*='border-l-2']")).not.toHaveClass("bg-brand/5");
+    const memo = within(tree).getByText("카페에서 잠시 쉬기").closest("[class*='border-l-2']");
+    expect(memo).not.toHaveClass("bg-brand/10");
 
     await user.click(within(tree).getByText("애월 해안도로"));
+    const aewolItem = within(tree).getByText("애월 해안도로").closest("[role=treeitem]");
+
+    expect(aewolItem).toHaveAttribute("aria-selected", "true");
+    expect(aewolItem?.querySelector('[data-slot="context-menu-trigger"]')).toHaveClass(
+      "border-brand",
+      "bg-brand/10",
+    );
+    expect(memo).toHaveClass("border-brand", "bg-brand/10");
+    // 선택한 장소로 들어오는 구간은 앞 장소가 선택되지 않았으므로 칠하지 않음
+    expect(screen.getByTestId("planner-route-day-one-aewol")).toHaveClass(
+      "border-transparent",
+      "bg-card",
+    );
+  });
+
+  it("carries the multi-selection band through memos and route segments", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(<PlannerWorkspace isNodeMoveEnabled onMoveNode={vi.fn()} projectId="demo" />);
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일" }));
+    await user.keyboard("{Shift>}");
+    await user.click(within(tree).getByRole("button", { name: "8월 13일" }));
+    await user.keyboard("{/Shift}");
 
     expect(within(tree).getByText("애월 해안도로").closest("[role=treeitem]")).toHaveAttribute(
-      "aria-selected",
-      "true",
+      "data-selection-state",
+      "range",
     );
-    expect(memo.closest("[class*='border-l-2']")).toHaveClass("bg-brand/5");
+    expect(
+      within(tree).getByText("카페에서 잠시 쉬기").closest("[class*='border-l-2']"),
+    ).toHaveClass("bg-brand/5");
+    for (const pathId of ["day-one-iho", "day-one-aewol", "day-one-hyeopjae"]) {
+      expect(screen.getByTestId(`planner-route-${pathId}`)).toHaveClass("bg-brand/5");
+    }
+  });
+
+  it("links route segments only between places selected together", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(<PlannerWorkspace isNodeMoveEnabled onMoveNode={vi.fn()} projectId="demo" />);
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+    await user.click(within(tree).getByText("제주국제공항"));
+    await user.keyboard("{Shift>}");
+    await user.click(within(tree).getByText("애월 해안도로"));
+    await user.keyboard("{/Shift}");
+
+    expect(screen.getByTestId("planner-route-day-one-iho")).toHaveClass(
+      "border-brand",
+      "bg-brand/10",
+    );
+    expect(screen.getByTestId("planner-route-day-one-aewol")).toHaveClass(
+      "border-brand",
+      "bg-brand/10",
+    );
+    // 애월에서 협재로 가는 구간은 협재가 선택 밖이라 띠가 여기서 끝남
+    expect(screen.getByTestId("planner-route-day-one-hyeopjae")).toHaveClass("bg-card");
   });
 
   it("keeps Activity names read-only and edits only their memo", async () => {
