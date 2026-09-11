@@ -10,6 +10,7 @@ import {
 } from "@/features/planner/utils/calculate-planner-distance";
 import {
   getPlannerRowHighlightClassName,
+  PLANNER_ROW_SURFACE_CLASS_NAME,
   type PlannerSelectionState,
 } from "@/features/planner/utils/get-planner-row-highlight";
 import { cn } from "@/lib/utils";
@@ -57,7 +58,8 @@ export function PlannerRouteInfo({
   return (
     <div
       className={cn(
-        "flex items-center border-l-2 bg-card text-[10px] leading-none",
+        "flex items-center bg-card text-[10px] leading-none",
+        PLANNER_ROW_SURFACE_CLASS_NAME,
         getPlannerRowHighlightClassName(highlight),
       )}
       style={{ height: PLANNER_ROUTE_INFO_HEIGHT, paddingLeft: indentation + 42 }}

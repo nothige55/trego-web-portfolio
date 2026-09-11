@@ -90,7 +90,11 @@ export function getPlannerRouteHighlight(
   return previous === "selected" && current === "selected" ? "selected" : "range";
 }
 
-// 라벨·메모·경로 정보가 공유하는 왼쪽 선과 배경. 셋 다 border-l-2를 깔고 이 색만 바꿈
+// 라벨·메모·경로 정보가 함께 까는 바탕. 전환 속도까지 같아야 강조가 한 번에 들어옴
+// 한쪽만 transition이 있으면 나머지가 먼저 칠해지고 그쪽이 뒤늦게 따라와 따로 노는 것처럼 보임
+export const PLANNER_ROW_SURFACE_CLASS_NAME = "border-l-2 transition-colors";
+
+// 바탕 위에 얹는 왼쪽 선 색과 배경
 const HIGHLIGHT_CLASS_NAMES: Record<PlannerRowHighlight, string> = {
   selected: "border-brand bg-brand/10",
   hovered: "border-brand/70 bg-brand/10",

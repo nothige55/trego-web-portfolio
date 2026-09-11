@@ -23,6 +23,7 @@ import {
   getPlannerRowHighlight,
   getPlannerRowHighlightClassName,
   getPlannerSelectionState,
+  PLANNER_ROW_SURFACE_CLASS_NAME,
 } from "@/features/planner/utils/get-planner-row-highlight";
 import { getPlannerRowIndentation } from "@/features/planner/utils/get-planner-row-indentation";
 
@@ -193,7 +194,7 @@ export function PlannerTreeItem({
           onBeginEditing={nameEditing.begin}
           trigger={
             <div
-              className={`group flex h-9 items-center border-l-2 text-foreground transition-colors ${
+              className={`group flex h-9 items-center text-foreground ${PLANNER_ROW_SURFACE_CLASS_NAME} ${
                 isChildTarget
                   ? "planner-child-drop-fill border-brand"
                   : isExpandingTarget

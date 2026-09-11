@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { PlannerMemoEditing } from "@/features/planner/hooks/use-planner-memo-editing";
 import type { PlannerNodeEditingCommands } from "@/features/planner/types/planner-editing-commands";
 import type { PlannerActivityNode } from "@/features/planner/types/planner-node";
+import { PLANNER_ROW_SURFACE_CLASS_NAME } from "@/features/planner/utils/get-planner-row-highlight";
 import { cn } from "@/lib/utils";
 
 export function PlannerActivityMemo({
@@ -28,7 +29,7 @@ export function PlannerActivityMemo({
 
   return (
     <div
-      className={cn("border-l-2 border-transparent pr-2 pb-2", className)}
+      className={cn(PLANNER_ROW_SURFACE_CLASS_NAME, "border-transparent pr-2 pb-2", className)}
       style={{ paddingLeft: indentation + 44 }}
       onPointerDown={(event) => event.stopPropagation()}
     >
