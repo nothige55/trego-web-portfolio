@@ -1,3 +1,6 @@
+// 행 이름의 인라인 편집 상태를 소유
+// Activity 이름은 서버 계약상 편집 대상이 아니므로 커밋 단계에서 걸러 냄
+
 import { useCallback, useState } from "react";
 
 import type { PlannerNodeEditingCommands } from "@/features/planner/types/planner-editing-commands";
@@ -17,8 +20,6 @@ export type PlannerNameEditing = {
   readonly commit: (node: FlattenedPlannerNode) => void;
 };
 
-// 행 이름의 인라인 편집 상태를 소유한다.
-// Activity 이름은 서버 계약상 편집 대상이 아니므로 커밋 단계에서 걸러 낸다.
 export function usePlannerNameEditing(commands?: PlannerNodeEditingCommands): PlannerNameEditing {
   const [editingPathId, setEditingPathId] = useState<PlannerNodePathId | null>(null);
   const [draft, setDraft] = useState("");

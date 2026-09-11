@@ -1,3 +1,5 @@
+// 정의되지 않은 URL에서 보여 주는 404 화면
+
 import { Link } from "react-router";
 
 export function NotFoundRoute() {

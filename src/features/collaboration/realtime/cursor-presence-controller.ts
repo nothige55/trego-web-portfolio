@@ -1,3 +1,6 @@
+// 원격 커서 목록과 내 커서 전송을 소유하는 React 밖의 presence controller
+// 전송은 50ms 간격으로 묶고, 원격 커서는 3초간 갱신이 없거나 연결이 끊기면 지움
+
 import { createCursorRealtimeAdapter } from "@/features/collaboration/realtime/cursor-realtime-adapter";
 import type {
   CursorPoint,

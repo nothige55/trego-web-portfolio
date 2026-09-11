@@ -1,3 +1,6 @@
+// axios를 감싼 공용 REST client로, 응답 본문만 반환
+// 인증 토큰과 401 처리는 콜백으로 주입받아 feature·app 상태를 직접 참조하지 않음
+
 import Axios, {
   type AxiosAdapter,
   type AxiosError,
@@ -12,7 +15,7 @@ import { env } from "@/config/env";
 type AccessTokenProvider = () => string | null | undefined;
 
 export type ApiClientOptions = {
-  // 요청을 네트워크 대신 다른 전송 계층으로 보낼 때 쓴다. interceptor와 응답 처리는 그대로 거친다.
+  // 요청을 네트워크 대신 다른 전송 계층으로 보낼 때 씀. interceptor와 응답 처리는 그대로 거침
   adapter?: AxiosAdapter;
   baseURL?: string;
   getAccessToken?: AccessTokenProvider;

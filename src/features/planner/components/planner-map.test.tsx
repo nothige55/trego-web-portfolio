@@ -368,7 +368,7 @@ describe("PlannerMap", () => {
       transform: "scale(1.35)",
     });
 
-    // 마커 아래에 경로선이 깔려 있어도 지도 click 핸들러가 Day를 대신 선택하지 않아야 한다.
+    // 마커 아래에 경로선이 깔려 있어도 지도 click 핸들러가 Day를 대신 선택하지 않아야 함
     const canvasContainer = document.createElement("div");
     const containerClick = vi.fn();
     canvasContainer.addEventListener("click", containerClick);
@@ -402,7 +402,7 @@ describe("PlannerMap", () => {
     });
     expect(usePlannerViewStore.getState().hoveredItemId).toBe("day-one");
     expect(map.getCanvas().style.cursor).toBe("pointer");
-    // 굵기는 즉시 튀지 않고 진행도 0에서 시작해 프레임마다 보간된다.
+    // 굵기는 즉시 튀지 않고 진행도 0에서 시작해 프레임마다 보간됨
     const routeSource = map.getSource("planner-routes") as MockSource;
     expect(routeSource.setData).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -447,7 +447,7 @@ describe("PlannerMap", () => {
       element.textContent?.includes("제주국제공항"),
     );
 
-    // 마커 위 포인터 이동도 지도까지 전달되므로 마커 아래 경로선이 hover를 가져가면 안 된다.
+    // 마커 위 포인터 이동도 지도까지 전달되므로 마커 아래 경로선이 hover를 가져가면 안 됨
     act(() => {
       airportMarker?.element.dispatchEvent(new Event("pointerenter"));
       map.trigger("mousemove", "planner-route-lines", {
@@ -456,7 +456,7 @@ describe("PlannerMap", () => {
     });
     expect(usePlannerViewStore.getState().hoveredItemId).toBe("day-one-airport");
 
-    // 마커를 벗어나 다시 선 위에 남으면 그 때 선이 hover를 넘겨받는다.
+    // 마커를 벗어나 다시 선 위에 남으면 그 때 선이 hover를 넘겨받음
     act(() => {
       airportMarker?.element.dispatchEvent(new Event("pointerleave"));
       map.trigger("mousemove", "planner-route-lines", {

@@ -1,6 +1,7 @@
+// Google Places 연결 전에도 검색·상세 UX를 검토할 수 있는 고정 데이터
+
 import type { MockPlace } from "@/features/places/types/mock-place";
 
-// Google Places 연결 전에도 검색·상세 UX를 검토할 수 있는 고정 데이터다.
 export const MOCK_PLACES: readonly MockPlace[] = [
   {
     id: "mock-seongsan",

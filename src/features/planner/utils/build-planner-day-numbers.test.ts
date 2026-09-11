@@ -4,7 +4,7 @@ import { demoPlannerProject } from "@/features/planner/data/demo-planner";
 import { buildPlannerDayNumbers } from "@/features/planner/utils/build-planner-day-numbers";
 import { buildPlannerTree } from "@/features/planner/utils/build-planner-tree";
 
-// Day 번호는 서버가 주지 않고 시작일 + 트리 순서로만 유도된다는 규칙을 고정한다.
+// Day 번호는 서버가 주지 않고 시작일 + 트리 순서로만 유도된다는 규칙을 고정
 describe("buildPlannerDayNumbers", () => {
   const tree = buildPlannerTree(demoPlannerProject.nodes);
 

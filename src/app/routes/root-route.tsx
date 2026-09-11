@@ -1,3 +1,6 @@
+// 홈 화면(home)과 내 프로젝트 목록·생성 API(project-management)를 조합하는 route
+// 비로그인 상태에서 로그인이 필요한 동작을 하면 인증 화면으로 전환
+
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 

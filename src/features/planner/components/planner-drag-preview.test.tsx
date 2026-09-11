@@ -31,7 +31,7 @@ describe("PlannerDragPreview", () => {
     expect(container.firstElementChild).toHaveStyle({ paddingLeft: "60px" });
   });
 
-  // 목록 폭을 채우면 커서 아래 행을 통째로 덮어 그 행이 사라진 것처럼 보인다.
+  // 목록 폭을 채우면 커서 아래 행을 통째로 덮어 그 행이 사라진 것처럼 보임
   it("takes only the width of its own label", () => {
     usePlannerViewStore.getState().load(demoPlannerProject.nodes);
     const { container } = render(<PlannerDragPreview node={nodeOf("day-one-iho")} />);

@@ -1,3 +1,6 @@
+// ProjectHub Planner 명령·이벤트의 서버 payload(*Request)와 앱 쪽 입력(*Input) 타입을 함께 정의
+// 서버 철자(type, marker, lat/lng, travelTimeMinuates)는 *Request에만 두고, realtime 밖에서는 *Input만 씀
+
 import type { PlannerActivityNode } from "@/features/planner/types/planner-node";
 
 export const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";

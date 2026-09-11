@@ -1,3 +1,6 @@
+// mapbox-gl 인스턴스의 명령형 생명주기를 한곳에 모음
+// 생성·로드 판정·모델 반영·hover 보간이 같은 ref 묶음을 공유하므로 더 쪼개지 않음
+
 import mapboxgl, { type Map as MapboxMap } from "mapbox-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -30,8 +33,6 @@ export type PlannerMapInstance = {
   readonly retry: () => void;
 };
 
-// mapbox-gl 인스턴스의 명령형 생명주기를 한곳에 모은다.
-// 생성·로드 판정·모델 반영·hover 보간이 같은 ref 묶음을 공유하므로 더 쪼개지 않는다.
 export function usePlannerMapInstance(accessToken: string | null | undefined): PlannerMapInstance {
   const tree = usePlannerViewStore((state) => state.tree);
   const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
@@ -192,7 +193,7 @@ export function usePlannerMapInstance(accessToken: string | null | undefined): P
     lastHandledFocusRequestRef.current = mapFocusRequest;
   }, [mapFocusRequest, mapModel]);
 
-  // hover 굵기를 프레임마다 보간해 넣는다. 첫 반영은 동기로 처리해 색·표시 여부는 즉시 맞춘다.
+  // hover 굵기를 프레임마다 보간해 넣음. 첫 반영은 동기로 처리해 색·표시 여부는 즉시 맞춤
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isLoadedRef.current) {

@@ -1,3 +1,5 @@
+// 커서 presence 타입. 화면 픽셀 좌표(CursorPoint)와 서버로 오가는 0–1 비율(CursorRatios)을 구분
+
 export interface CursorPoint {
   readonly x: number;
   readonly y: number;

@@ -6,8 +6,8 @@ import { usePlannerViewStore } from "@/features/planner/stores/planner-view-stor
 import type { PlannerNodeEditingCommands } from "@/features/planner/types/planner-editing-commands";
 import { fireEvent, render, screen, userEvent, waitFor, within } from "@/testing/test-utils";
 
-// jsdom에는 WebGL이 없어 실제 PlannerMap은 항상 초기화에 실패하고 role="alert" 안내를 띄운다.
-// 이 파일이 검증하는 일정 패널과 무관하므로 지도는 대체한다.
+// jsdom에는 WebGL이 없어 실제 PlannerMap은 항상 초기화에 실패하고 role="alert" 안내를 띄움
+// 이 파일이 검증하는 일정 패널과 무관하므로 지도는 대체
 vi.mock("@/features/planner/components/planner-map", () => ({
   PlannerMap: () => <section aria-label="지도 영역" />,
 }));
@@ -350,7 +350,7 @@ describe("PlannerSchedulePanel", () => {
     );
   });
 
-  // 경로 정보는 두 노드 사이의 것이라 드래그 단위 안에 들어가면 rect와 충돌 판정이 어긋난다.
+  // 경로 정보는 두 노드 사이의 것이라 드래그 단위 안에 들어가면 rect와 충돌 판정이 어긋남
   it("keeps route info outside the draggable node", async () => {
     const user = userEvent.setup();
     usePlannerViewStore.getState().load(demoPlannerProject.nodes);
@@ -364,17 +364,17 @@ describe("PlannerSchedulePanel", () => {
     const routeInfo = screen.getByTestId("planner-route-day-one-iho");
     const nodeBox = ihoItem?.querySelector("[data-planner-node]");
 
-    // 노드와 함께 움직이도록 같은 treeitem 안에 있되, 잡는 단위 밖에 놓인다.
+    // 노드와 함께 움직이도록 같은 treeitem 안에 있되, 잡는 단위 밖에 놓임
     expect(ihoItem?.contains(routeInfo)).toBe(true);
     expect(nodeBox?.contains(routeInfo)).toBe(false);
-    // 노드 박스 바로 앞자리다. 밀림 transform을 자식에 걸려고 한 겹 더 감싸므로 포함으로 본다.
+    // 노드 박스 바로 앞자리. 밀림 transform을 자식에 걸려고 한 겹 더 감싸므로 포함으로 봄
     expect(
       nodeBox?.previousElementSibling?.contains(routeInfo.closest("[data-planner-route-slot]")),
     ).toBe(true);
   });
 
   // 경로 정보는 노드의 속성이 아니라 두 장소 사이의 구간이라, 잡은 노드가 빠지면
-  // 사라지는 게 아니라 앞뒤가 이어붙는다. 드래그 중에도 지금 놓으면 나올 값을 보여 준다.
+  // 사라지는 게 아니라 앞뒤가 이어붙음. 드래그 중에도 지금 놓으면 나올 값을 보여 줌
   it("reconnects the route across the place that is being dragged out", async () => {
     const user = userEvent.setup();
     usePlannerViewStore.getState().load(demoPlannerProject.nodes);
@@ -391,25 +391,25 @@ describe("PlannerSchedulePanel", () => {
       within(screen.getByTestId("planner-route-day-one-aewol")).getByRole("link"),
     ).toHaveAccessibleName("이호테우해변에서 애월 해안도로까지 길찾기");
 
-    // 목록 밖(좌우)으로 끌어내 목적지가 없는 상태다.
+    // 목록 밖(좌우)으로 끌어내 목적지가 없는 상태
     dndState.activePathId = "day-one-iho";
     dndState.isOutsideList = true;
     rerender(<PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />);
 
-    // 이호테우해변이 빠진 자리에서 앞뒤 장소가 곧바로 이어진다.
+    // 이호테우해변이 빠진 자리에서 앞뒤 장소가 곧바로 이어짐
     expect(
       within(screen.getByTestId("planner-route-day-one-aewol")).getByRole("link"),
     ).toHaveAccessibleName("제주국제공항에서 애월 해안도로까지 길찾기");
-    // 목록 밖으로 나온 노드에는 들어오는 구간이 없다.
+    // 목록 밖으로 나온 노드에는 들어오는 구간이 없음
     expect(screen.queryByTestId("planner-route-day-one-iho")).not.toBeInTheDocument();
-    // 떨어져 있는 구간은 그대로다.
+    // 떨어져 있는 구간은 그대로
     expect(
       within(screen.getByTestId("planner-route-day-one-hyeopjae")).getByRole("link"),
     ).toHaveAccessibleName("애월 해안도로에서 협재해수욕장까지 길찾기");
   });
 
   // 받아 주지 않는 자리나 컨테이너 안으로 넣는 중에는 놓아도 순서가 바뀌지 않으므로
-  // 목록도 경로 정보도 원래 모습 그대로 둔다.
+  // 목록도 경로 정보도 원래 모습 그대로 둠
   it("leaves the schedule untouched while hovering where it cannot land", async () => {
     const user = userEvent.setup();
     usePlannerViewStore.getState().load(demoPlannerProject.nodes);
@@ -447,7 +447,7 @@ describe("PlannerSchedulePanel", () => {
     await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
     await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
 
-    // 이호테우해변을 빼서 제주국제공항과 애월 해안도로 사이에 도로 끼우는 자리다.
+    // 이호테우해변을 빼서 제주국제공항과 애월 해안도로 사이에 도로 끼우는 자리
     dndState.activePathId = "day-one-iho";
     dndState.isSiblingDropActive = true;
     dndState.dropDestination = { parentPathId: "day-one", siblingIndex: 1 };
@@ -460,7 +460,7 @@ describe("PlannerSchedulePanel", () => {
       within(screen.getByTestId("planner-route-day-one-aewol")).getByRole("link"),
     ).toHaveAccessibleName("이호테우해변에서 애월 해안도로까지 길찾기");
 
-    // 맨 뒤로 옮기면 두 구간 모두 새 이웃으로 다시 잡힌다.
+    // 맨 뒤로 옮기면 두 구간 모두 새 이웃으로 다시 잡힘
     dndState.dropDestination = { parentPathId: "day-one", siblingIndex: 3 };
     rerender(<PlannerWorkspace isNodeMoveEnabled onMoveNode={onMoveNode} projectId="demo" />);
 

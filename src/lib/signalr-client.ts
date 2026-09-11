@@ -1,3 +1,6 @@
+// SignalR 연결의 시작·재시도·중지 lifecycle과 연결 상태 구독만 담당
+// Hub 메서드와 이벤트 이름은 모르며, 그 계약은 각 feature의 realtime 모듈이 소유
+
 import { type HubConnection, HubConnectionBuilder, HubConnectionState } from "@microsoft/signalr";
 
 import { env } from "@/config/env";

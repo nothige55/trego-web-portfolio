@@ -1,3 +1,6 @@
+// 드롭 요청(부모 + 형제 index)이 트리 규칙상 허용되는지 판정하고, 허용되면 저장할 position을 계산
+// 포인터와 dnd-kit을 모르는 순수 규칙이라 드래그 중 표시와 드롭 확정이 같은 판정을 따름
+
 import type {
   FlattenedPlannerNode,
   PlannerNode,

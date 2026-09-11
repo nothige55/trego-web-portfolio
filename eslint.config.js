@@ -41,7 +41,7 @@ const sharedLayerTargets = [
 ];
 
 export default defineConfig([
-  // 에이전트 워크트리가 루트 안에 생기면 낡은 사본까지 검사 대상이 된다.
+  // 에이전트 워크트리가 루트 안에 생기면 낡은 사본까지 검사 대상이 됨
   globalIgnores(["dist", "coverage", ".claude", ".codex"]),
   {
     files: ["**/*.{ts,tsx}"],

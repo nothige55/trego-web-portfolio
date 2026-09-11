@@ -1,3 +1,6 @@
+// 프로젝트 실시간 세션을 React 생명주기에 연결해 context로 노출하고, 연결 상태 배너를 제공
+// projectId가 바뀌면 key로 인스턴스를 새로 만들어 SignalR client와 세션을 통째로 교체
+
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {

@@ -1,3 +1,6 @@
+// Planner의 Explore 패널에 들어가는 장소 검색·상세 화면
+// 데이터는 MOCK_PLACES 고정값이며 일정 추가 버튼은 아직 비활성 상태
+
 import {
   ArrowLeft,
   Clock3,

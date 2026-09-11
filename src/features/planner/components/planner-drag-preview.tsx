@@ -1,13 +1,13 @@
+// DragOverlay 안에서 커서를 따라다니는 행 미리보기
+// 잡는 단위가 라벨부터 시작하므로 오버레이 기준점도 그대로 라벨 상단이 됨
+
 import { PlannerNodeLabel } from "@/features/planner/components/planner-node-label";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { FlattenedPlannerNode } from "@/features/planner/types/planner-node";
 import { getPlannerRowIndentation } from "@/features/planner/utils/get-planner-row-indentation";
 
-// DragOverlay 안에서 커서를 따라다니는 행 미리보기다.
-// 잡는 단위가 라벨부터 시작하므로 오버레이 기준점도 그대로 라벨 상단이 된다.
-//
-// 목록 폭을 그대로 채우면 커서 아래 행을 통째로 덮어, 그 행이 사라진 것처럼 보인다.
-// 내용만큼만 차지하고 그림자로 떠 있음을 알려 아래 행이 계속 읽히게 한다.
+// 목록 폭을 그대로 채우면 커서 아래 행을 통째로 덮어, 그 행이 사라진 것처럼 보임
+// 내용만큼만 차지하고 그림자로 떠 있음을 알려 아래 행이 계속 읽히게 함
 export function PlannerDragPreview({
   node,
   dayNumber,

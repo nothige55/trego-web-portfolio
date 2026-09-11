@@ -1,3 +1,6 @@
+// 목록 위에 고정되는 조작 줄
+// 각 버튼은 대응하는 command가 주입된 경우에만 노출해 읽기 전용 세션에서 빈 동작을 만들지 않음
+
 import { ListChevronsDownUp, Redo2, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -6,8 +9,6 @@ import { usePlannerHistoryStore } from "@/features/planner/stores/planner-histor
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { PlannerNodeEditingCommands } from "@/features/planner/types/planner-editing-commands";
 
-// 목록 위에 고정되는 조작 줄이다.
-// 각 버튼은 대응하는 command가 주입된 경우에만 노출해 읽기 전용 세션에서 빈 동작을 만들지 않는다.
 export function PlannerScheduleToolbar({
   commands,
 }: {
@@ -21,7 +22,7 @@ export function PlannerScheduleToolbar({
   const historyFutureCount = usePlannerHistoryStore((state) => state.future.length);
   const isHistoryReplaying = usePlannerHistoryStore((state) => state.isReplaying);
   const rootChildren = rootPathId ? (tree.childrenMap.get(rootPathId) ?? []) : [];
-  // 접힌 부모 아래의 펼침 상태는 복원용으로 보존하되 버튼 노출에는 사용하지 않는다.
+  // 접힌 부모 아래의 펼침 상태는 복원용으로 보존하되 버튼 노출에는 사용하지 않음
   const hasExpandedTopLevelBranch = rootChildren.some(
     (node) => expandedIds.has(node.pathId) && (tree.childrenMap.get(node.pathId)?.length ?? 0) > 0,
   );

@@ -1,3 +1,5 @@
+// 드롭 목적지(부모 + position)를 잡은 노드에 적용해 트리를 다시 만드는 순수 함수
+
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
 import type {
   FlattenedPlannerNode,

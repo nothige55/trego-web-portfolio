@@ -30,8 +30,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    // 에이전트 워크트리가 프로젝트 루트 안에 생성되면 낡은 테스트 파일까지 수집된다.
-    // 그 파일들은 @/ alias를 통해 루트 src를 읽으므로 검증 의미도 없다.
+    // 에이전트 워크트리가 프로젝트 루트 안에 생성되면 낡은 테스트 파일까지 수집됨
+    // 그 파일들은 @/ alias를 통해 루트 src를 읽으므로 검증 의미도 없음
     exclude: [...configDefaults.exclude, "**/.claude/**", "**/.codex/**"],
     setupFiles: "./src/testing/setup-tests.ts",
   },

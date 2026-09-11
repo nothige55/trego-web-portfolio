@@ -1,3 +1,6 @@
+// 원본 nodes와 파생 tree를 함께 갱신하고, 그 위의 확장·선택·지도 focus·모듈 패널 같은 화면 상태를 소유
+// 재조회와 실시간 반영은 replaceNodes로 들어오며, 새 트리에 남은 선택·확장 상태만 유지
+
 import { create } from "zustand";
 
 import type { PlannerDropDestination } from "@/features/planner/dnd/planner-drop-rules";
@@ -50,7 +53,7 @@ type PlannerViewActions = {
 
 type PlannerViewStore = PlannerViewState & PlannerViewActions;
 
-// Map과 Set을 매번 새로 만들어 reset 간에 변경 가능한 컬렉션이 공유되지 않게 한다.
+// Map과 Set을 매번 새로 만들어 reset 간에 변경 가능한 컬렉션이 공유되지 않게 함
 function createEmptyTree(): PlannerTree {
   return {
     entityMap: new Map(),
@@ -79,7 +82,7 @@ function createInitialState(): PlannerViewState {
 export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
   ...createInitialState(),
   load(nodes) {
-    // 정규화된 원본 노드와 화면 조회에 필요한 세 가지 파생 구조를 함께 갱신한다.
+    // 정규화된 원본 노드와 화면 조회에 필요한 세 가지 파생 구조를 함께 갱신
     const tree = buildPlannerTree(nodes);
     const rootNode = tree.flattenedItems.find((node) => node.parentPathId === null) ?? null;
 
@@ -143,7 +146,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
       } else {
         expandedIds.add(pathId);
 
-        // 접힌 조상 아래의 노드를 열더라도 대상이 실제로 보이도록 모든 조상도 펼친다.
+        // 접힌 조상 아래의 노드를 열더라도 대상이 실제로 보이도록 모든 조상도 펼침
         let currentNode = state.tree.entityMap.get(pathId);
         while (currentNode?.parentPathId) {
           expandedIds.add(currentNode.parentPathId);
@@ -186,8 +189,8 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
         return state;
       }
 
-      // 레거시 Planner처럼 드롭한 클라이언트는 원본 노드를 먼저 갱신해 즉시 반영한다.
-      // 이후 같은 payload의 optimistic reducer와 sender echo는 idempotent no-op이 된다.
+      // 레거시 Planner처럼 드롭한 클라이언트는 원본 노드를 먼저 갱신해 즉시 반영
+      // 이후 같은 payload의 optimistic reducer와 sender echo는 idempotent no-op이 됨
       const nodes = state.nodes.map((node) =>
         node.pathId === pathId
           ? {
@@ -227,7 +230,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
         : undefined;
     }
 
-    // 같은 노드를 다시 눌러도 새 요청 객체를 만들어 지도 포커스를 다시 실행한다.
+    // 같은 노드를 다시 눌러도 새 요청 객체를 만들어 지도 포커스를 다시 실행
     set({
       selectedItemId: pathId,
       hoveredItemId: null,
@@ -286,7 +289,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
       entityMap: state.tree.entityMap,
     });
 
-    // Shift 선택 중에도 최초 단일 선택은 anchor로 유지해 연속 범위 선택 기준으로 사용한다.
+    // Shift 선택 중에도 최초 단일 선택은 anchor로 유지해 연속 범위 선택 기준으로 사용
     set({
       mapFocusRequest: null,
       multiSelectedIds: selectedItems.map((item) => item.pathId),
@@ -303,7 +306,7 @@ export const usePlannerViewStore = create<PlannerViewStore>((set, get) => ({
     });
   },
   setActiveModule(activeModule) {
-    // 탭을 직접 선택하면 접혀 있던 패널도 다시 표시하는 기존 UX를 유지한다.
+    // 탭을 직접 선택하면 접혀 있던 패널도 다시 표시하는 기존 UX를 유지
     set({ activeModule, isModuleCollapsed: false });
   },
   setModuleCollapsed(isModuleCollapsed) {

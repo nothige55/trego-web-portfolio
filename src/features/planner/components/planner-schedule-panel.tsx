@@ -1,3 +1,6 @@
+// 일정 트리를 조합하고, 드래그 중 행을 옮기는 데 필요한 측정값(행 ref, 노드 높이)을 소유
+// 행 렌더링은 PlannerTreeItem, 편집·스크롤·단축키 상태는 planner/hooks, 파생 계산은 planner/utils에 둠
+
 import {
   closestCenter,
   DndContext,
@@ -41,8 +44,6 @@ import { getPlannerRowAdornments } from "@/features/planner/utils/get-planner-ro
 import { getPlannerRowIndentation } from "@/features/planner/utils/get-planner-row-indentation";
 import { getVisiblePlannerNodes } from "@/features/planner/utils/get-visible-planner-nodes";
 
-// 이 파일은 일정 트리의 조합만 담당한다.
-// 행 렌더링은 PlannerTreeItem, 편집·스크롤·단축키 상태는 planner/hooks, 파생 계산은 planner/utils에 둔다.
 type PlannerSchedulePanelProps = {
   readonly commands?: PlannerNodeEditingCommands;
   readonly isNodeMoveEnabled: boolean;
@@ -77,7 +78,7 @@ export function PlannerSchedulePanel({
     (pathId: PlannerNodePathId): HTMLDivElement | null => itemRefs.current.get(pathId) ?? null,
     [],
   );
-  // 노드가 떠나면 그 앞머리인 경로 정보도 함께 닫히므로 자리는 li 기준으로 잰다.
+  // 노드가 떠나면 그 앞머리인 경로 정보도 함께 닫히므로 자리는 li 기준으로 잼
   const getItemBlockHeight = useCallback((pathId: PlannerNodePathId): number => {
     const element = itemRefs.current.get(pathId);
     if (!element) {
@@ -87,14 +88,14 @@ export function PlannerSchedulePanel({
     return element.parentElement?.offsetHeight ?? element.offsetHeight;
   }, []);
   const [dragFootprintHeight, setDragFootprintHeight] = useState(0);
-  // 드래그 시작 때 잰 노드 박스 높이다. 밀림 거리를 이 값으로 계산한다.
-  // offsetHeight는 transform과 무관해 드래그 중에도 바뀌지 않는다.
+  // 드래그 시작 때 잰 노드 박스 높이. 밀림 거리를 이 값으로 계산
+  // offsetHeight는 transform과 무관해 드래그 중에도 바뀌지 않음
   const [dragNodeHeights, setDragNodeHeights] = useState<ReadonlyMap<PlannerNodePathId, number>>(
     () => new Map(),
   );
   const nameEditing = usePlannerNameEditing(commands);
   const memoEditing = usePlannerMemoEditing(commands);
-  // 메모 편집기는 행 안에서 열리므로 여는 동작만 command 묶음에 끼워 하위로 내려보낸다.
+  // 메모 편집기는 행 안에서 열리므로 여는 동작만 command 묶음에 끼워 하위로 내려보냄
   const commandBindings = commands
     ? { ...commands, editActivityMemo: memoEditing.open }
     : undefined;
@@ -102,7 +103,7 @@ export function PlannerSchedulePanel({
     () => getVisiblePlannerNodes(tree.flattenedItems, expandedIds, tree.childrenMap),
     [expandedIds, tree.childrenMap, tree.flattenedItems],
   );
-  // root는 프로젝트 컨테이너이므로 탐색 순서에는 사용하되 목록에서는 숨긴다.
+  // root는 프로젝트 컨테이너이므로 탐색 순서에는 사용하되 목록에서는 숨김
   const renderedItems = useMemo(
     () => visibleItems.filter((item) => item.pathId !== rootPathId),
     [rootPathId, visibleItems],
@@ -166,7 +167,7 @@ export function PlannerSchedulePanel({
     handleDragStart(event);
   };
   const handlePanelDragMove = (event: DragMoveEvent): void => {
-    // 드래그 중에 펼쳐져 새로 그려진 행은 시작 때 재지 못했으니 여기서 채운다.
+    // 드래그 중에 펼쳐져 새로 그려진 행은 시작 때 재지 못했으니 여기서 채움
     const additions: [PlannerNodePathId, number][] = [];
     for (const [itemPathId, element] of itemRefs.current) {
       if (!dragNodeHeights.has(itemPathId)) {
@@ -189,10 +190,10 @@ export function PlannerSchedulePanel({
     handleDragCancel();
   };
   const activeNode = activePathId ? tree.entityMap.get(activePathId) : undefined;
-  // 드래그 중에는 목록이 "지금 놓으면" 보일 모습으로 그린다.
+  // 드래그 중에는 목록이 "지금 놓으면" 보일 모습으로 그림
   // - 목록 밖: 잡은 노드를 빼고 구멍 없이 닫힌 일정
   // - 형제 사이 자리: 잡은 노드를 그 자리에 끼운 일정
-  // - 그 밖(받아 주지 않는 자리, 컨테이너 안으로 넣는 중): 아무것도 옮기지 않는다
+  // - 그 밖(받아 주지 않는 자리, 컨테이너 안으로 넣는 중): 아무것도 옮기지 않음
   const dragLayout = useMemo(() => {
     if (!activePathId || (!isOutsideList && !(isSiblingDropActive && dropDestination))) {
       return null;
@@ -241,8 +242,8 @@ export function PlannerSchedulePanel({
       ),
     [activePathId, dragLayout, rootPathId, sortableItems, topItemId, tree],
   );
-  // 레이아웃 높이는 그대로 두고 노드 박스만 옮긴다. dnd-kit이 시작 때 잰 rect가 끝까지
-  // 유효하고, 경로 정보 칸이 생기거나 사라지는 것도 옮기는 거리 안에서 흡수된다.
+  // 레이아웃 높이는 그대로 두고 노드 박스만 옮김. dnd-kit이 시작 때 잰 rect가 끝까지
+  // 유효하고, 경로 정보 칸이 생기거나 사라지는 것도 옮기는 거리 안에서 흡수됨
   const dragOffsets = useMemo(
     () =>
       dragLayout
@@ -304,9 +305,9 @@ export function PlannerSchedulePanel({
             entityMap={tree.entityMap}
           />
           {/* over는 포인터가 멈춰 있어도 리렌더로 다시 계산되는데 onDragMove는 그때
-              불리지 않는다. 그것만 물면 경로 정보 미리보기가 한 프레임 뒤처져 화면
-              순서와 어긋난다. onDragOver는 over가 바뀌는 시점에 setOver와 같은
-              배치로 불리므로 둘을 같이 문다. */}
+              불리지 않음. 그것만 물면 경로 정보 미리보기가 한 프레임 뒤처져 화면
+              순서와 어긋남. onDragOver는 over가 바뀌는 시점에 setOver와 같은
+              배치로 불리므로 둘 다 같은 핸들러를 씀 */}
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -316,9 +317,9 @@ export function PlannerSchedulePanel({
             onDragOver={handlePanelDragMove}
             onDragStart={handlePanelDragStart}
           >
-            {/* 밀림은 전략이 내는 transform이 아니라 dragOffsets로 그린다. 드래그 중 경로 정보
-                칸이 생기거나 사라지는 걸 전략은 모르기 때문이다. 전략은 목록 모양에 맞는
-                세로 목록 전략으로 두되, 화면에는 쓰지 않는다. */}
+            {/* 밀림은 전략이 내는 transform이 아니라 dragOffsets로 그림. 드래그 중 경로 정보
+                칸이 생기거나 사라지는 걸 전략은 모르기 때문. 전략은 목록 모양에 맞는
+                세로 목록 전략으로 두되, 화면에는 쓰지 않음 */}
             <SortableContext
               items={sortableItems.map((node) => node.pathId)}
               strategy={verticalListSortingStrategy}
@@ -329,7 +330,7 @@ export function PlannerSchedulePanel({
                 className="min-h-full outline-none"
                 tabIndex={0}
                 onClick={(event) => {
-                  // 노드 클릭의 bubbling으로 선택이 풀리지 않도록 실제 빈 영역만 처리한다.
+                  // 노드 클릭의 bubbling으로 선택이 풀리지 않도록 실제 빈 영역만 처리
                   if (event.target === event.currentTarget) {
                     clearSelection();
                   }
@@ -349,7 +350,7 @@ export function PlannerSchedulePanel({
                   const { boundaryAncestor, hasRouteSlot, previousActivity, showsRouteInfo } =
                     rowAdornments.get(node.pathId)!;
                   const isDraggingList = activePathId !== null;
-                  // 목록에서 빠진 잡은 노드는 보일 배치에 없다. 그 행에는 아무것도 그리지 않는다.
+                  // 목록에서 빠진 잡은 노드는 보일 배치에 없음. 그 행에는 아무것도 그리지 않음
                   const isInVisibleLayout = !dragOffsets || dragOffsets.has(node.pathId);
 
                   return (
@@ -358,8 +359,8 @@ export function PlannerSchedulePanel({
                       node={node}
                       routeInfo={
                         node.kind === "activity" && hasRouteSlot ? (
-                          // 레이아웃 높이를 지키는 칸이다. 드래그 중에는 비워 두고,
-                          // 내용은 노드 박스에 붙은 dragRouteInfo가 노드와 함께 옮긴다.
+                          // 레이아웃 높이를 지키는 칸. 드래그 중에는 비워 두고,
+                          // 내용은 노드 박스에 붙은 dragRouteInfo가 노드와 함께 옮김
                           <div
                             data-planner-route-slot=""
                             style={{ height: PLANNER_ROUTE_INFO_HEIGHT, overflow: "hidden" }}

@@ -1,3 +1,6 @@
+// 로그인과 회원가입을 한 화면에서 전환하는 인증 폼
+// 입력값과 실패 문구만 소유하고, 실제 요청과 세션 저장은 app/auth가 콜백으로 맡음
+
 import { ArrowLeft, LogIn, UserPlus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 

@@ -4,7 +4,7 @@ import { demoPlannerProject } from "@/features/planner/data/demo-planner";
 import { buildPlannerTree } from "@/features/planner/utils/build-planner-tree";
 import { getVisiblePlannerNodes } from "@/features/planner/utils/get-visible-planner-nodes";
 
-// 접힌 노드 아래의 모든 깊이가 화면 목록에서 제외되는지 검증한다.
+// 접힌 노드 아래의 모든 깊이가 화면 목록에서 제외되는지 검증
 describe("getVisiblePlannerNodes", () => {
   const tree = buildPlannerTree(demoPlannerProject.nodes);
 

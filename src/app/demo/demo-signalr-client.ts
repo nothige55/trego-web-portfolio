@@ -1,3 +1,7 @@
+// 실제 SignalRClient와 같은 상태 전이를 냄
+// 회선이 끊기면 reconnecting으로 머물고, 회선이 돌아오면 새 서버 연결로 connected가 됨
+// 새 연결은 그룹에 참여하지 않은 상태라, 실제와 마찬가지로 세션이 JoinProject와 resync를 다시 실행해야 함
+
 import type { DemoNetwork } from "@/app/demo/demo-network";
 import type { DemoProjectServer, DemoServerConnection } from "@/app/demo/demo-project-server";
 import { simulateLatency } from "@/app/demo/simulate-latency";
@@ -26,9 +30,6 @@ class DemoStartCancelledError extends Error {
 
 type EventHandler = (...args: readonly unknown[]) => void;
 
-// 실제 SignalRClient와 같은 상태 전이를 낸다.
-// 회선이 끊기면 reconnecting으로 머물고, 회선이 돌아오면 새 서버 연결로 connected가 된다.
-// 새 연결은 그룹에 참여하지 않은 상태라, 실제와 마찬가지로 세션이 JoinProject와 resync를 다시 실행해야 한다.
 export function createDemoSignalRClient({
   connectDelayMs = DEFAULT_CONNECT_DELAY_MS,
   network,

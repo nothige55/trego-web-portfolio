@@ -1,3 +1,5 @@
+// 앱의 URL 구조(홈, 프로젝트 planner, 404)와 route별 오류 화면을 정의
+
 import { createBrowserRouter } from "react-router";
 
 import { NotFoundRoute } from "@/app/routes/not-found-route";

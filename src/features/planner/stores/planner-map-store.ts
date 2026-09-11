@@ -1,3 +1,5 @@
+// 지도에서 숨긴 Day 집합만 소유. Day 행의 표시 토글과 지도 인스턴스 hook이 이 값을 공유
+
 import { create } from "zustand";
 
 import type { PlannerNodePathId } from "@/features/planner/types/planner-node";

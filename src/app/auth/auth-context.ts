@@ -1,3 +1,5 @@
+// AuthProvider가 채우는 인증 context의 계약과 이를 읽는 useAuth hook을 둠
+
 import { createContext, useContext } from "react";
 
 import type { AuthSession, LoginInput, RegisterInput } from "@/features/auth/types";

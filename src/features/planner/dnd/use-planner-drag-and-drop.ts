@@ -1,3 +1,6 @@
+// dnd-kit 드래그 이벤트를 드롭 판정과 이동 명령으로 잇는 어댑터 hook
+// 컨테이너 안으로 넣기 위한 hover 타이머와 드래그 중 목적지 상태를 소유하고, 확정은 주입받은 moveNode로 넘김
+
 import {
   type DragEndEvent,
   type DragMoveEvent,
@@ -31,7 +34,7 @@ interface UsePlannerDragAndDropParams {
   readonly visibleItems: readonly FlattenedPlannerNode[];
   readonly expandedIds: ReadonlySet<PlannerNodePathId>;
   readonly expandNode: (pathId: PlannerNodePathId) => void;
-  // 목록의 좌우 경계다. 포인터가 이 밖으로 나가면 놓을 자리가 없는 것으로 본다.
+  // 목록의 좌우 경계. 포인터가 이 밖으로 나가면 놓을 자리가 없는 것으로 봄
   readonly getListBounds?: () => Readonly<{ left: number; right: number }> | null;
   readonly moveNode: (
     pathId: PlannerNodePathId,
@@ -63,9 +66,9 @@ export function usePlannerDragAndDrop({
     null,
   );
   const [isSiblingDropActive, setIsSiblingDropActive] = useState(false);
-  // 포인터가 목록 좌우 밖에 있는지다. 이때만 잡은 노드를 목록에서 빼서 보여 준다.
+  // 포인터가 목록 좌우 밖에 있는지 여부. 이때만 잡은 노드를 목록에서 빼서 보여 줌
   const [isOutsideList, setIsOutsideList] = useState(false);
-  // 지금 놓으면 들어갈 자리다. 경로 정보 미리보기가 이 값으로 이웃 관계를 다시 계산한다.
+  // 지금 놓으면 들어갈 자리. 경로 정보 미리보기가 이 값으로 이웃 관계를 다시 계산
   const [dropDestination, setDropDestination] = useState<PlannerDragDestination | null>(null);
   const [horizontalOffset, setHorizontalOffset] = useState(0);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,8 +101,8 @@ export function usePlannerDragAndDrop({
     setHorizontalOffset(0);
   }
 
-  // 잡은 노드를 뺐다가 원래 자리에 도로 끼우는 목적지다.
-  // 규칙 계산이 "unchanged"를 돌려줄 때, 목록을 원래 모습 그대로 보여 주려고 쓴다.
+  // 잡은 노드를 뺐다가 원래 자리에 도로 끼우는 목적지
+  // 규칙 계산이 "unchanged"를 돌려줄 때, 목록을 원래 모습 그대로 보여 주려고 씀
   function getCurrentDestination(pathId: PlannerNodePathId): PlannerDragDestination | null {
     const node = tree.entityMap.get(pathId);
     if (!node?.parentPathId) {
@@ -112,8 +115,8 @@ export function usePlannerDragAndDrop({
     return siblingIndex < 0 ? null : { parentPathId: node.parentPathId, siblingIndex };
   }
 
-  // closestCenter는 포인터가 어디에 있든 가장 가까운 행을 늘 하나 고른다. 그래서 목록을
-  // 옆으로 벗어난 것과 목록 위에 있는 것을 구분하지 못한다. 포인터의 x를 직접 보고 가른다.
+  // closestCenter는 포인터가 어디에 있든 가장 가까운 행을 늘 하나 고름. 그래서 목록을
+  // 옆으로 벗어난 것과 목록 위에 있는 것을 구분하지 못함. 포인터의 x를 직접 보고 가름
   function isPointerOutsideList(event: DragMoveEvent | DragEndEvent): boolean {
     const bounds = getListBounds?.();
     const activator = event.activatorEvent;
@@ -125,8 +128,8 @@ export function usePlannerDragAndDrop({
     return pointerX < bounds.left || pointerX > bounds.right;
   }
 
-  // dragMove는 포인터가 움직일 때마다 들어온다. 값이 같은데도 새 객체를 넣으면 매 이벤트마다
-  // 리렌더가 나고, 그 사이 끼어든 렌더 때문에 dnd-kit이 낸 이동량이 행마다 어긋난다.
+  // dragMove는 포인터가 움직일 때마다 들어옴. 값이 같은데도 새 객체를 넣으면 매 이벤트마다
+  // 리렌더가 나고, 그 사이 끼어든 렌더 때문에 dnd-kit이 낸 이동량이 행마다 어긋남
   function updateDropDestination(next: PlannerDragDestination | null): void {
     setDropDestination((previous) => {
       if (
@@ -178,7 +181,7 @@ export function usePlannerDragAndDrop({
     const isOutside = isPointerOutsideList(event);
     setIsOutsideList(isOutside);
     if (isOutside) {
-      // 목록 밖에서는 잡은 노드가 잠시 빠진 것으로 보여 준다.
+      // 목록 밖에서는 잡은 노드가 잠시 빠진 것으로 보여 줌
       clearHoverState();
       setIsSiblingDropActive(false);
       updateDropDestination(null);
@@ -238,7 +241,7 @@ export function usePlannerDragAndDrop({
       }
 
       // 기존 Planner의 fill cue처럼 빈 컨테이너 진입 즉시 시각 상태를 켜고,
-      // 실제 child drop 승인은 800ms 뒤에만 허용한다.
+      // 실제 child drop 승인은 800ms 뒤에만 허용
       setChildTargetPathId(overPathId);
       hoverTimerRef.current = setTimeout(() => {
         readyChildTargetPathIdRef.current = overPathId;
@@ -263,7 +266,7 @@ export function usePlannerDragAndDrop({
       horizontalOffset: event.delta.x,
     });
     setIsSiblingDropActive(siblingResult.accepted || siblingResult.reason === "unchanged");
-    // 받아 주지 않는 자리 위에서는 목적지가 없다. 그때는 잡은 노드가 빠진 목록만 보여 준다.
+    // 받아 주지 않는 자리 위에서는 목적지가 없음. 그때는 잡은 노드가 빠진 목록만 보여 줌
     updateDropDestination(
       siblingResult.accepted
         ? siblingResult.destination
@@ -274,7 +277,7 @@ export function usePlannerDragAndDrop({
   }
 
   function handleDragEnd(event: DragEndEvent): void {
-    // 목록 밖에서 놓으면 자리를 고르지 않은 것이므로 이동 없이 되돌린다.
+    // 목록 밖에서 놓으면 자리를 고르지 않은 것이므로 이동 없이 되돌림
     if (!rootPathId || !activePathId || !event.over || isPointerOutsideList(event)) {
       resetDragState();
       return;
@@ -315,7 +318,7 @@ export function usePlannerDragAndDrop({
     if (result.accepted) {
       moveNode(activePathId, result.destination);
       if (isReadyEmptyChildDrop) {
-        // 빈 대상은 이동 전에는 펼칠 자식이 없으므로, 트리 갱신 뒤에 펼친다.
+        // 빈 대상은 이동 전에는 펼칠 자식이 없으므로, 트리 갱신 뒤에 펼침
         expandNode(result.destination.parentPathId);
       }
     }

@@ -1,3 +1,6 @@
+/* Tailwind v4·shadcn 테마 토큰과 전역 base 스타일을 정의
+   스크롤바 숨김 유틸리티와 planner 드롭 채움 애니메이션도 여기에 둠 */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";

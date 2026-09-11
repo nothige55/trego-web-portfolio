@@ -28,7 +28,7 @@ vi.mock("@/features/planner/components/planner-map", () => ({
   },
 }));
 
-// 실제 Maps나 API 없이 사용자가 확인할 수 있는 Planner shell의 동작만 검증한다.
+// 실제 Maps나 API 없이 사용자가 확인할 수 있는 Planner shell의 동작만 검증
 describe("PlannerWorkspace", () => {
   afterEach(() => {
     usePlannerMapStore.getState().reset();
@@ -58,7 +58,7 @@ describe("PlannerWorkspace", () => {
           treeItem.textContent?.includes(candidate),
         );
         const top = name ? (topByName.get(name) ?? 100) : 100;
-        // breadcrumb 기준은 경로 정보를 뺀 노드 박스의 상단이다.
+        // breadcrumb 기준은 경로 정보를 뺀 노드 박스의 상단
         const nodeBox = treeItem.querySelector("[data-planner-node]") ?? treeItem;
         nodeBox.getBoundingClientRect = () => ({ top }) as DOMRect;
       });

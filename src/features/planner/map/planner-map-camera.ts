@@ -1,8 +1,9 @@
+// 지도 카메라 이동 규칙. 초기 진입은 전체 일정을 담고, 이후 focus 요청은 해당 대상만 확대
+
 import type { Map as MapboxMap } from "mapbox-gl";
 
 import type { PlannerMapFocus, PlannerMapModel } from "@/features/planner/map/planner-map-model";
 
-// 지도 카메라 이동 규칙이다. 초기 진입은 전체 일정을 담고, 이후 focus 요청은 해당 대상만 확대한다.
 export const DEFAULT_CENTER: [longitude: number, latitude: number] = [126.5312, 33.4996];
 export const DEFAULT_ZOOM = 9;
 const SINGLE_MARKER_ZOOM = 13;

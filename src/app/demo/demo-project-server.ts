@@ -1,3 +1,9 @@
+// 브라우저 안에서 도는 가짜 백엔드. 실제 서버의 성질을 일부러 그대로 따름
+// - 요청 payload를 검증 없이 그룹 전원에게 되쏨. 보낸 접속자도 echo를 받음
+// - 이벤트는 참여 중인 접속자에게만 감. 끊긴 동안의 이벤트는 쌓아 두지 않고 버림
+// - 기준 상태는 REST 스냅샷으로만 다시 받을 수 있음
+// 그래야 데모에서도 idempotent reducer, 실패 시 resync, 재연결 복구 코드가 실제로 동작
+
 import type { DemoMember, DemoProjectSeed } from "@/app/demo/demo-seed";
 import { simulateLatency } from "@/app/demo/simulate-latency";
 import type { ChatMessage, SendMessageHubRequest } from "@/features/chat/types/chat-message";
@@ -11,7 +17,7 @@ import type {
 import type { PlannerNode } from "@/features/planner/types/planner-node";
 import type { PlannerProjectDetails } from "@/features/planner/types/planner-project";
 
-// 실제 Hub처럼 명령 이름과 되쏘는 이벤트 이름을 1:1로 맞춘다.
+// 실제 Hub처럼 명령 이름과 되쏘는 이벤트 이름을 1:1로 맞춤
 const PLANNER_COMMAND_EVENTS = {
   CreateFolder: "OnFolderCreated",
   CreateDay: "OnDayCreated",
@@ -69,11 +75,6 @@ function isPlannerCommand(methodName: string): methodName is PlannerHubCommandNa
   return Object.hasOwn(PLANNER_COMMAND_EVENTS, methodName);
 }
 
-// 브라우저 안에서 도는 가짜 백엔드다. 실제 서버의 성질을 일부러 그대로 따른다.
-// - 요청 payload를 검증 없이 그룹 전원에게 되쏜다. 보낸 접속자도 echo를 받는다.
-// - 이벤트는 참여 중인 접속자에게만 간다. 끊긴 동안의 이벤트는 쌓아 두지 않고 버린다.
-// - 기준 상태는 REST 스냅샷으로만 다시 받을 수 있다.
-// 그래야 데모에서도 idempotent reducer, 실패 시 resync, 재연결 복구 코드가 실제로 돈다.
 export function createDemoProjectServer({
   latencyMs = DEFAULT_LATENCY_MS,
   members,

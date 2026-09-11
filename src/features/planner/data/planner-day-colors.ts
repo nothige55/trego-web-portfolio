@@ -1,4 +1,4 @@
-// 기존 Planner의 Day 색상 팔레트를 순서까지 유지한다.
+// 기존 Planner의 Day 색상 팔레트를 순서까지 유지
 export const PLANNER_DAY_COLORS = [
   "#FF0000",
   "#FFC107",

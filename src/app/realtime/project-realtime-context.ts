@@ -1,3 +1,5 @@
+// ProjectRealtimeProvider가 채우는 실시간 세션 context의 계약과 이를 읽는 useProjectRealtime hook을 둠
+
 import { createContext, useContext } from "react";
 
 import type { ProjectRealtimeSessionSnapshot } from "@/app/realtime/project-realtime-session";

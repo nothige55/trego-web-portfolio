@@ -61,7 +61,7 @@ describe("buildPlannerDragProjection", () => {
     expect(namesOf(projection, "day-two")[0]).toBe("day-one-iho");
   });
 
-  // 목적지 index는 규칙 계산이 낸 값이지만 드래그 중 트리와 어긋날 수 있다.
+  // 목적지 index는 규칙 계산이 낸 값이지만 드래그 중 트리와 어긋날 수 있음
   it("clamps a sibling index that the current tree cannot hold", () => {
     const projection = buildPlannerDragProjection({
       tree,

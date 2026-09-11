@@ -1,3 +1,6 @@
+// 프로젝트 초기 데이터(일정 + 채팅 기록)의 적재와 재조회를 함께 소유
+// 두 요청은 재동기화 때 항상 같이 실행되고 "지금 열려 있는 프로젝트인가" 판정을 공유하므로 한 hook에 둠
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -12,10 +15,10 @@ import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store"
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { ApiClient } from "@/lib/api-client";
 
-// status는 "화면에 보여 줄 일정이 store에 있는가"를, error는 마지막 조회의 실패 원인을 나타낸다.
-// - loading: 이 프로젝트의 일정을 아직 받지 못했다.
-// - error: 첫 조회가 실패해 보여 줄 일정이 없다.
-// - ready: 일정이 적재되어 있다. 재조회가 실패해도 ready를 유지하고 error만 채운다.
+// status는 "화면에 보여 줄 일정이 store에 있는가"를, error는 마지막 조회의 실패 원인을 나타냄
+// - loading: 이 프로젝트의 일정을 아직 받지 못함
+// - error: 첫 조회가 실패해 보여 줄 일정이 없음
+// - ready: 일정이 적재되어 있음. 재조회가 실패해도 ready를 유지하고 error만 채움
 export type ProjectDataState = {
   readonly error: Error | null;
   readonly projectId: string;
@@ -41,8 +44,6 @@ export type ProjectDataLoader = {
   readonly reload: () => Promise<void>;
 };
 
-// 프로젝트 초기 데이터(일정 + 채팅 기록)의 적재와 재조회를 함께 소유한다.
-// 두 요청은 재동기화 때 항상 같이 실행되고 "지금 열려 있는 프로젝트인가" 판정을 공유하므로 한 hook에 둔다.
 export function useProjectDataLoader({
   projectId,
   restClient,
@@ -103,9 +104,9 @@ export function useProjectDataLoader({
     return promise;
   }, [projectId, restClient]);
 
-  // 재조회(refresh)는 이미 떠 있는 일정을 그대로 두고, 응답이 오면 노드만 교체한다.
+  // 재조회(refresh)는 이미 떠 있는 일정을 그대로 두고, 응답이 오면 노드만 교체
   // loading으로 되돌리면 호출부가 fallback 화면으로 바꾸면서 PlannerWorkspace가 unmount되어
-  // 트리 스크롤 위치와 지도 인스턴스를 잃는다. initial은 store를 비운 직후라 항상 loading부터 시작한다.
+  // 트리 스크롤 위치와 지도 인스턴스를 잃음. initial은 store를 비운 직후라 항상 loading부터 시작
   const loadProjectData = useCallback(
     (mode: ProjectDataLoadMode): Promise<void> => {
       const pendingRequest = projectDataRequestRef.current;
@@ -144,8 +145,8 @@ export function useProjectDataLoader({
             activeProjectIdRef.current === projectId &&
             projectRequestIdRef.current === requestId
           ) {
-            // 보여 줄 일정이 이미 있으면 화면을 유지하고 원인만 기록한다.
-            // 사용자에게는 호출부가 받는 rejection(featureError·실시간 연결 배너)으로 드러난다.
+            // 보여 줄 일정이 이미 있으면 화면을 유지하고 원인만 기록
+            // 사용자에게는 호출부가 받는 rejection(featureError·실시간 연결 배너)으로 드러남
             setProjectDataState((current) =>
               isReadyFor(current, projectId)
                 ? { ...current, error: projectError }

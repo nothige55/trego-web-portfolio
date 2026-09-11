@@ -1,3 +1,6 @@
+// 두 장소 좌표 사이의 직선(하버사인) 거리와 그 표기를 계산
+// 좌표가 없으면 null을 돌려주며, 행 장식은 이 값으로 경로 정보를 그릴지 정함
+
 import type { PlannerActivityNode } from "@/features/planner/types/planner-node";
 
 const EARTH_RADIUS_KM = 6371;

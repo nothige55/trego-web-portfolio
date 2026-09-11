@@ -7,7 +7,7 @@ import {
   getShiftSelectionRange,
 } from "@/features/planner/utils/calculate-shift-selection";
 
-// 기존 Planner에서 중요한 양방향 범위 및 부모-자손 정규화 규칙을 회귀 테스트로 고정한다.
+// 기존 Planner에서 중요한 양방향 범위 및 부모-자손 정규화 규칙을 회귀 테스트로 고정
 describe("calculateShiftSelection", () => {
   const tree = buildPlannerTree(demoPlannerProject.nodes);
 

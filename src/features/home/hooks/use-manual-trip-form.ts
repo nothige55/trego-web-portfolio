@@ -1,3 +1,6 @@
+// 새 여행 다이얼로그의 입력 상태와 검증을 소유
+// 시작일을 종료일보다 뒤로 옮기면 이미 고른 종료일은 무효가 되므로 여기에서 함께 비움
+
 import { useId, useState } from "react";
 
 import type { CreateTripInput } from "../types";
@@ -28,8 +31,6 @@ export type ManualTripForm = {
   readonly submit: () => CreateTripInput | null;
 };
 
-// 새 여행 다이얼로그의 입력 상태와 검증을 소유한다.
-// 시작일을 종료일보다 뒤로 옮기면 이미 고른 종료일은 무효가 되므로 여기에서 함께 비운다.
 export function useManualTripForm(): ManualTripForm {
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState<Date>();

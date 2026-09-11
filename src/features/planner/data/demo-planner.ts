@@ -1,3 +1,6 @@
+// 정규화된 PlannerNode로 만든 제주 여행 샘플 일정
+// 여행 일정 외에 드롭 규칙 검증용 노드(empty-wish, dnd-test-day 서브트리)도 함께 담음
+
 import type { PlannerActivityNode, PlannerNode } from "@/features/planner/types/planner-node";
 import type { PlannerProjectDetails } from "@/features/planner/types/planner-project";
 
@@ -22,7 +25,7 @@ type DemoActivityInput = {
   readonly travelDistance?: number | null;
 };
 
-// 장소마다 반복되는 nullable API 필드를 기본값으로 채워 일정 자체를 읽기 쉽게 유지한다.
+// 장소마다 반복되는 nullable API 필드를 기본값으로 채워 일정 자체를 읽기 쉽게 유지
 function createActivity({
   name,
   pathId,
@@ -62,8 +65,8 @@ function createActivity({
   };
 }
 
-// API 이식 전 Planner 화면과 상호작용 테스트에 사용하는 결정론적 데이터다.
-// 서버 DTO를 흉내 내지 않고, 이미 정규화된 PlannerNode 계약만 사용한다.
+// API 이식 전 Planner 화면과 상호작용 테스트에 사용하는 결정론적 데이터
+// 서버 DTO를 흉내 내지 않고, 이미 정규화된 PlannerNode 계약만 사용
 export const demoPlannerProject: DemoPlannerProject = {
   publicId: "demo",
   title: "제주도 7일 여행",
@@ -71,7 +74,7 @@ export const demoPlannerProject: DemoPlannerProject = {
   endDate: "2026-08-18",
   isPublic: false,
   nodes: [
-    // root는 프로젝트 전체를 감싸는 가상 컨테이너이며 화면 목록에서는 숨긴다.
+    // root는 프로젝트 전체를 감싸는 가상 컨테이너이며 화면 목록에서는 숨김
     {
       id: "demo-root",
       kind: "folder",
@@ -82,7 +85,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       color: "#0D99FF",
       folderType: "root",
     },
-    // wish 폴더는 실제 일정에 아직 배치하지 않은 후보 장소를 표현한다.
+    // wish 폴더는 실제 일정에 아직 배치하지 않은 후보 장소를 표현
     {
       id: "demo-wish",
       kind: "folder",
@@ -125,7 +128,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       startTime: null,
       memo: "등산 예약과 장비 준비 필요",
     }),
-    // 일반 빈 폴더는 트리에서 제거되므로, 빈 자식 드롭을 검증할 수 있는 wish를 둔다.
+    // 일반 빈 폴더는 트리에서 제거되므로, 빈 자식 드롭을 검증할 수 있는 wish를 둠
     {
       id: "demo-empty-wish",
       kind: "folder",
@@ -136,7 +139,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       color: "#EC4899",
       folderType: "wish",
     },
-    // 지역 폴더 아래에 Day를 두어 root → 지역 → 날짜 → 장소의 깊은 계층을 확인한다.
+    // 지역 폴더 아래에 Day를 두어 root → 지역 → 날짜 → 장소의 깊은 계층을 확인
     {
       id: "demo-region-jeju",
       kind: "folder",
@@ -158,7 +161,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       folderType: "default",
     },
 
-    // 제주도 1일차: 공항 도착 후 서쪽 해안으로 이동한다.
+    // 제주도 1일차: 공항 도착 후 서쪽 해안으로 이동
     {
       id: "demo-day-one",
       kind: "day",
@@ -222,7 +225,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       travelDistance: 17.2,
     }),
 
-    // 제주도 2일차: 동쪽 숲과 해변을 따라 이동한다.
+    // 제주도 2일차: 동쪽 숲과 해변을 따라 이동
     {
       id: "demo-day-two",
       kind: "day",
@@ -285,7 +288,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       travelDistance: 12.7,
     }),
 
-    // 제주도 3일차: 중산간 숲을 지나 제주시 야시장으로 돌아온다.
+    // 제주도 3일차: 중산간 숲을 지나 제주시 야시장으로 돌아옴
     {
       id: "demo-day-three",
       kind: "day",
@@ -349,7 +352,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       travelDistance: 6.1,
     }),
 
-    // 서귀포 1일차: 서쪽 명소를 거쳐 숙소가 있는 남쪽으로 이동한다.
+    // 서귀포 1일차: 서쪽 명소를 거쳐 숙소가 있는 남쪽으로 이동
     {
       id: "demo-day-four",
       kind: "day",
@@ -412,7 +415,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       travelDistance: 16.8,
     }),
 
-    // 서귀포 2일차: 중문에서 서귀포 시내까지 이어지는 코스다.
+    // 서귀포 2일차: 중문에서 서귀포 시내까지 이어지는 코스
     {
       id: "demo-day-five",
       kind: "day",
@@ -475,7 +478,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       travelDistance: 1.4,
     }),
 
-    // 서귀포 3일차: 폭포와 쇠소깍을 따라 남동쪽으로 이동한다.
+    // 서귀포 3일차: 폭포와 쇠소깍을 따라 남동쪽으로 이동
     {
       id: "demo-day-six",
       kind: "day",
@@ -538,7 +541,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       travelDistance: 10.5,
     }),
 
-    // 서귀포 4일차: 성산 일대에서 마지막 날을 보낸다.
+    // 서귀포 4일차: 성산 일대에서 마지막 날을 보냄
     {
       id: "demo-day-seven",
       kind: "day",
@@ -601,7 +604,7 @@ export const demoPlannerProject: DemoPlannerProject = {
       travelDistance: 24.6,
     }),
 
-    // 루트 직속 Day에서 빈 group 진입과 single 자식 이동을 독립적으로 확인한다.
+    // 루트 직속 Day에서 빈 group 진입과 single 자식 이동을 독립적으로 확인
     {
       id: "demo-dnd-test-day",
       kind: "day",

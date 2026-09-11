@@ -1,3 +1,5 @@
+// Day 행에 붙는 지도 표시·숨김 토글. 숨긴 Day 집합은 planner-map-store가 소유
+
 import { Eye, EyeOff } from "lucide-react";
 
 import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store";

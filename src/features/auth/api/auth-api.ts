@@ -1,3 +1,6 @@
+// 로그인·회원가입·현재 회원 조회 REST 요청을 담당
+// 서버 응답 형태(publicId 등)는 여기서 흡수하고 AuthenticatedMember로만 내보냄
+
 import type { AuthenticatedMember, LoginInput, RegisterInput } from "@/features/auth/types";
 import type { ApiClient } from "@/lib/api-client";
 import { apiClient } from "@/lib/api-client";

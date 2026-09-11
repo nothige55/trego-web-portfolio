@@ -1,3 +1,6 @@
+// 툴바에서 여는 일정 추가 dialog
+// 날짜는 여행 종료일을 하루 늘려 추가하고, 위시리스트 폴더는 루트 아래에 새로 만듦
+
 import { Plus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 

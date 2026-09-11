@@ -1,10 +1,11 @@
+// 메시지 목록과 그 자리를 대신하는 로딩·오류·빈 상태를 함께 담당
+
 import { LoaderCircle, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { ChatMessage } from "@/features/chat";
 import { ChatMessageBubble } from "@/features/chat/components/chat-message-bubble";
 
-// 메시지 목록과 그 자리를 대신하는 로딩·오류·빈 상태를 함께 담당한다.
 export function ChatMessageList({
   currentUserId,
   historyStatus,

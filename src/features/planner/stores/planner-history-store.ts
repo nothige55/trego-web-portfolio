@@ -1,3 +1,6 @@
+// undo/redo 스택을 소유. 항목은 스냅샷이 아니라 redo/undo 커맨드 배열 쌍
+// 재생이 끝나기 전에는 isReplaying으로 다음 undo/redo를 막음
+
 import { create } from "zustand";
 
 import type { PlannerOperationCommand } from "@/features/planner/operations/planner-operation-command";
