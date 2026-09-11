@@ -3,6 +3,7 @@
 
 import {
   ArrowLeft,
+  Check,
   Clock3,
   ExternalLink,
   Globe2,
@@ -15,14 +16,25 @@ import {
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { MOCK_PLACES } from "@/features/places/data/mock-places";
-import type { MockPlace } from "@/features/places/types/mock-place";
+import type { MockPlace, PlaceAddTarget } from "@/features/places/types/mock-place";
 
 function PlaceDetail({
   place,
+  targets,
+  onAddPlace,
   onBack,
 }: {
   readonly place: MockPlace;
+  readonly targets: readonly PlaceAddTarget[];
+  readonly onAddPlace?: PlaceAddHandler;
   readonly onBack: () => void;
 }) {
   return (
@@ -105,23 +117,130 @@ function PlaceDetail({
         </span>
       </div>
 
-      <Button
-        type="button"
-        className="mt-6 w-full"
-        disabled
-        title="Google Places 연결 후 제공됩니다"
-      >
-        <Plus aria-hidden="true" />
-        일정에 추가
-      </Button>
-      <p className="mt-2 text-center text-[11px] leading-4 text-muted-foreground">
-        실제 장소 확인과 일정 추가는 Google Places 연결 후 활성화됩니다.
-      </p>
+      <PlaceAddControl place={place} targets={targets} onAddPlace={onAddPlace} />
     </article>
   );
 }
 
-export function MockPlaceExplorer() {
+export type PlaceAddHandler = (place: MockPlace, target: PlaceAddTarget) => Promise<void>;
+
+type PlaceAddStatus =
+  | Readonly<{ kind: "idle" }>
+  | Readonly<{ kind: "pending" }>
+  | Readonly<{ kind: "added"; label: string }>
+  | Readonly<{ kind: "error"; message: string }>;
+
+const TARGET_GROUPS = [
+  { group: "day", label: "날짜" },
+  { group: "wish", label: "가보고 싶은 곳" },
+] as const;
+
+function PlaceAddControl({
+  place,
+  targets,
+  onAddPlace,
+}: {
+  readonly place: MockPlace;
+  readonly targets: readonly PlaceAddTarget[];
+  readonly onAddPlace?: PlaceAddHandler;
+}) {
+  const [isOpen, setOpen] = useState(false);
+  const [status, setStatus] = useState<PlaceAddStatus>({ kind: "idle" });
+  const isDisabled = !onAddPlace || status.kind === "pending";
+
+  const addTo = async (target: PlaceAddTarget) => {
+    if (!onAddPlace) {
+      return;
+    }
+
+    setOpen(false);
+    setStatus({ kind: "pending" });
+    try {
+      await onAddPlace(place, target);
+      setStatus({ kind: "added", label: target.label });
+    } catch (error) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : "일정에 추가하지 못했습니다.",
+      });
+    }
+  };
+
+  return (
+    <div className="mt-6">
+      <Popover open={isOpen} onOpenChange={setOpen}>
+        <PopoverTrigger disabled={isDisabled} render={<Button type="button" className="w-full" />}>
+          <Plus aria-hidden="true" />
+          {status.kind === "pending" ? "추가 중…" : "일정에 추가"}
+        </PopoverTrigger>
+        <PopoverContent align="center" className="w-(--anchor-width) gap-3 p-2">
+          <PopoverHeader className="px-1 pt-1">
+            <PopoverTitle>어느 일정에 넣을까요?</PopoverTitle>
+          </PopoverHeader>
+          {targets.length > 0 ? (
+            TARGET_GROUPS.map(({ group, label }) => {
+              const groupTargets = targets.filter((target) => target.group === group);
+              return groupTargets.length > 0 ? (
+                <div key={group} role="group" aria-label={label}>
+                  <p className="px-1 pb-1 text-[11px] font-medium text-muted-foreground">{label}</p>
+                  <ul className="scrollbar-hide max-h-48 space-y-0.5 overflow-y-auto">
+                    {groupTargets.map((target) => (
+                      <li key={target.id}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                          onClick={() => void addTo(target)}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="size-2 shrink-0 rounded-full bg-brand"
+                            style={target.color ? { backgroundColor: target.color } : undefined}
+                          />
+                          <span className="truncate">{target.label}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null;
+            })
+          ) : (
+            <p className="px-1 pb-1 text-xs leading-5 text-muted-foreground">
+              장소를 넣을 날짜가 없습니다. 일정에서 날짜를 먼저 추가해 주세요.
+            </p>
+          )}
+        </PopoverContent>
+      </Popover>
+
+      {status.kind === "added" ? (
+        <p
+          role="status"
+          className="mt-2 flex items-center justify-center gap-1 text-xs font-medium text-brand"
+        >
+          <Check aria-hidden="true" className="size-3.5" />
+          {status.label}에 추가했습니다.
+        </p>
+      ) : status.kind === "error" ? (
+        <p role="alert" className="mt-2 text-center text-xs text-destructive">
+          {status.message}
+        </p>
+      ) : (
+        <p className="mt-2 text-center text-[11px] leading-4 text-muted-foreground">
+          {onAddPlace
+            ? "목업 장소입니다. 실제 장소 검색은 Google Places 연결 후 제공됩니다."
+            : "실시간 연결이 준비되면 일정에 추가할 수 있습니다."}
+        </p>
+      )}
+    </div>
+  );
+}
+
+type MockPlaceExplorerProps = {
+  readonly addTargets?: readonly PlaceAddTarget[];
+  readonly onAddPlace?: PlaceAddHandler;
+};
+
+export function MockPlaceExplorer({ addTargets = [], onAddPlace }: MockPlaceExplorerProps) {
   const [query, setQuery] = useState("");
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const selectedPlace = MOCK_PLACES.find((place) => place.id === selectedPlaceId);
@@ -140,7 +259,15 @@ export function MockPlaceExplorer() {
   );
 
   if (selectedPlace) {
-    return <PlaceDetail place={selectedPlace} onBack={() => setSelectedPlaceId(null)} />;
+    return (
+      <PlaceDetail
+        key={selectedPlace.id}
+        place={selectedPlace}
+        targets={addTargets}
+        onAddPlace={onAddPlace}
+        onBack={() => setSelectedPlaceId(null)}
+      />
+    );
   }
 
   return (

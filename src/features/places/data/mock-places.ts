@@ -1,4 +1,5 @@
-// Google Places 연결 전에도 검색·상세 UX를 검토할 수 있는 고정 데이터
+// Google Places 연결 전에도 검색·상세·일정 추가 UX를 검토할 수 있는 고정 데이터
+// 좌표는 일정에 추가했을 때 지도 마커와 경로가 실제 위치에 그려지도록 넣은 근사값
 
 import type { MockPlace } from "@/features/places/types/mock-place";
 
@@ -9,6 +10,8 @@ export const MOCK_PLACES: readonly MockPlace[] = [
     category: "자연 명소",
     summary: "제주 동쪽 바다와 분화구 능선을 함께 볼 수 있는 대표적인 일출 명소입니다.",
     address: "제주특별자치도 서귀포시 성산읍 일출로 284-12",
+    latitude: 33.4581,
+    longitude: 126.9425,
     hours: "매일 07:30–19:00",
     phone: "064-783-0959",
     website: "https://www.visitjeju.net/",
@@ -23,6 +26,8 @@ export const MOCK_PLACES: readonly MockPlace[] = [
     category: "숲·공원",
     summary: "오래된 비자나무 사이를 천천히 걸으며 제주의 숲을 경험할 수 있는 산책 코스입니다.",
     address: "제주특별자치도 제주시 구좌읍 비자숲길 55",
+    latitude: 33.4909,
+    longitude: 126.8083,
     hours: "매일 09:00–18:00",
     phone: "064-710-7912",
     website: "https://www.visitjeju.net/",
@@ -38,6 +43,8 @@ export const MOCK_PLACES: readonly MockPlace[] = [
     summary:
       "애월 바다를 바라보며 쉬어 갈 수 있는 목업 카페입니다. 실제 장소 API 연결 전 UI 검토용입니다.",
     address: "제주특별자치도 제주시 애월읍 애월해안로",
+    latitude: 33.4631,
+    longitude: 126.3093,
     hours: "매일 10:00–21:00",
     phone: "064-000-0000",
     website: "https://www.visitjeju.net/",
@@ -52,6 +59,8 @@ export const MOCK_PLACES: readonly MockPlace[] = [
     category: "해변",
     summary: "맑고 얕은 바다와 비양도 풍경을 함께 볼 수 있어 일몰 일정에 잘 어울리는 해변입니다.",
     address: "제주특별자치도 제주시 한림읍 한림로 329-10",
+    latitude: 33.394,
+    longitude: 126.2397,
     hours: "상시 개방",
     phone: "064-728-3981",
     website: "https://www.visitjeju.net/",

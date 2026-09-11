@@ -3,6 +3,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import { PlannerPlaceExplorer } from "@/app/realtime/planner-place-explorer";
 import { ProjectPlannerFallbackScreen } from "@/app/realtime/project-planner-fallback-screen";
 import { useProjectRealtime } from "@/app/realtime/project-realtime-context";
 import {
@@ -23,7 +24,6 @@ import {
 import { RealtimeChatPanel } from "@/features/chat/components/realtime-chat-panel";
 import { CursorPresenceLayer } from "@/features/collaboration/components/cursor-presence-layer";
 import type { CursorPresenceController } from "@/features/collaboration/realtime/cursor-presence-controller";
-import { MockPlaceExplorer } from "@/features/places/components/mock-place-explorer";
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
 import { usePlannerNodeMove } from "@/features/planner/hooks/use-planner-node-move";
 import { usePlannerRecordedOperations } from "@/features/planner/hooks/use-planner-recorded-operations";
@@ -173,7 +173,13 @@ function ProjectPlannerPageContent({
         </div>
       ) : null}
       <PlannerWorkspace
-        exploreContent={<MockPlaceExplorer />}
+        exploreContent={
+          <PlannerPlaceExplorer
+            createPlaceActivity={
+              isReady ? plannerNodeEditingCommands.createPlaceActivity : undefined
+            }
+          />
+        }
         isNodeMoveEnabled={isReady && !isMovePending}
         onMoveNode={moveNode}
         plannerCommands={isReady ? plannerNodeEditingCommands : undefined}

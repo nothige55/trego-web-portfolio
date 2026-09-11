@@ -5,7 +5,7 @@ import { ProjectPlannerPage } from "@/app/realtime/project-planner-page";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { ApiClient } from "@/lib/api-client";
 import type { SignalRClient, SignalRConnectionStatus } from "@/lib/signalr-client";
-import { act, fireEvent, render, screen, userEvent, waitFor } from "@/testing/test-utils";
+import { act, fireEvent, render, screen, userEvent, waitFor, within } from "@/testing/test-utils";
 
 vi.mock("@/features/planner/components/planner-map", () => ({
   PlannerMap: () => <section aria-label="지도 영역" />,
@@ -170,6 +170,72 @@ describe("ProjectPlannerPage", () => {
         0.5,
       ),
     );
+  });
+
+  it("adds an explored place under the chosen day and records it for undo", async () => {
+    const signalR = createFakeSignalRClient();
+    const rest = createRestClient();
+    const respondWithDefaultData = rest.get.getMockImplementation()!;
+    const dayPathId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    rest.get.mockImplementation(async (url: string) =>
+      url.endsWith("/nodes")
+        ? [
+            ...((await respondWithDefaultData(url)) as readonly unknown[]),
+            {
+              kind: "day",
+              id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+              name: "8월 1일",
+              color: "#F44336",
+              pathId: dayPathId,
+              parentPathId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+              position: 0.1,
+            },
+          ]
+        : respondWithDefaultData(url),
+    );
+    const user = userEvent.setup();
+    render(
+      <ProjectPlannerPage
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "11111111-1111-1111-1111-111111111111",
+          name: "One",
+        }}
+        projectId="33333333-3333-3333-3333-333333333333"
+        restClient={rest.client}
+      />,
+    );
+    await screen.findByRole("heading", { name: "Live project" });
+
+    await user.click(screen.getByRole("button", { name: /성산일출봉/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "일정에 추가" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "일정에 추가" }));
+    const dayTargets = await screen.findByRole("group", { name: "날짜" });
+    await user.click(within(dayTargets).getByRole("button", { name: "8월 1일" }));
+
+    expect(await screen.findByText("8월 1일에 추가했습니다.")).toBeInTheDocument();
+    expect(signalR.invoke).toHaveBeenCalledWith(
+      "CreateActivity",
+      expect.objectContaining({
+        name: "성산일출봉",
+        lat: 33.4581,
+        lng: 126.9425,
+        parentPathId: dayPathId,
+        type: "single",
+      }),
+    );
+    const tree = screen.getByRole("tree");
+    const addedRow = within(tree).getByText("성산일출봉").closest("[role=treeitem]");
+    expect(addedRow).toHaveAttribute("aria-selected", "true");
+
+    const created = signalR.invoke.mock.calls.find(([method]) => method === "CreateActivity")!;
+    await user.click(screen.getByRole("button", { name: "실행 취소" }));
+    expect(signalR.invoke).toHaveBeenCalledWith("DeleteNode", {
+      pathId: (created[1] as { pathId: string }).pathId,
+    });
+    await waitFor(() => expect(within(tree).queryByText("성산일출봉")).not.toBeInTheDocument());
   });
 
   it("loads REST chat history even when the realtime connection fails", async () => {
