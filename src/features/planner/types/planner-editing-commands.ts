@@ -21,7 +21,7 @@ export type PlannerNodeEditingCommands = Pick<
   "deleteNode" | "updateActivity" | "updateDay" | "updateFolder"
 > & {
   readonly createNode?: (draft: PlannerCreateNodeDraft) => Promise<void>;
-  // 만든 활동의 pathId를 돌려주어 호출한 쪽이 곧바로 선택·지도 포커스를 옮길 수 있게 한다.
+  // 만든 활동의 pathId를 돌려주어 호출한 쪽이 곧바로 선택·지도 포커스를 옮길 수 있게 함
   readonly createPlaceActivity?: (draft: PlannerPlaceActivityDraft) => Promise<PlannerNodePathId>;
   readonly deleteNodes?: (pathIds: readonly PlannerNodePathId[]) => Promise<void>;
   readonly editActivityMemo?: (pathId: PlannerNodePathId) => void;

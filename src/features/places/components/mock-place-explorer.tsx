@@ -1,5 +1,5 @@
-// Planner의 Explore 패널에 들어가는 장소 검색·상세 화면
-// 데이터는 MOCK_PLACES 고정값이며 일정 추가 버튼은 아직 비활성 상태
+// Planner의 Explore 패널에 들어가는 장소 검색·상세·일정 추가 화면
+// 데이터는 MOCK_PLACES 고정값이며, 추가할 날짜 목록과 추가 동작은 app 레이어가 주입
 
 import {
   ArrowLeft,
@@ -138,7 +138,7 @@ type PlaceAddStatus =
   | Readonly<{ kind: "added"; label: string }>
   | Readonly<{ kind: "error"; message: string }>;
 
-// 날짜 이름은 짧아 3열에 들어가지만 위시리스트 이름은 길어서 2열로 둔다.
+// 날짜 이름은 짧아 3열에 들어가지만 위시리스트 이름은 길어서 2열로 둠
 const TARGET_GROUPS = [
   { group: "day", label: "날짜", columns: "grid-cols-3" },
   { group: "wish", label: "가보고 싶은 곳", columns: "grid-cols-2" },
@@ -219,7 +219,7 @@ function PlaceAddControl({
             <PopoverTitle>어느 일정에 넣을까요?</PopoverTitle>
           </PopoverHeader>
           {targets.length > 0 ? (
-            // 날짜가 많아도 팝오버가 길어지지 않도록 칩을 격자로 놓고, 그래도 넘치면 안에서 스크롤한다.
+            // 날짜가 많아도 팝오버가 길어지지 않도록 칩을 격자로 놓고, 그래도 넘치면 안에서 스크롤
             <div className="scrollbar-hide max-h-72 space-y-3 overflow-y-auto">
               {TARGET_GROUPS.map(({ columns, group, label }) => {
                 const groupTargets = targets.filter((target) => target.group === group);
@@ -276,7 +276,7 @@ function PlaceAddControl({
 
 type MockPlaceExplorerProps = {
   readonly addTargets?: readonly PlaceAddTarget[];
-  // 일정에서 지금 보고 있는 날짜. 같은 날에 연달아 넣을 때 바로 찾도록 강조한다.
+  // 일정에서 지금 보고 있는 날짜. 같은 날에 연달아 넣을 때 바로 찾도록 강조
   readonly currentTargetId?: string | null;
   readonly onAddPlace?: PlaceAddHandler;
 };

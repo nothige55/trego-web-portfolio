@@ -81,7 +81,7 @@ function createActivityInput(
   };
 }
 
-// 장소 검색 결과처럼 좌표를 가진 단일 장소를 대상 부모의 마지막에 붙인다.
+// 장소 검색 결과처럼 좌표를 가진 단일 장소를 대상 부모의 마지막에 붙임
 export function buildPlaceActivityInput(
   nodes: readonly PlannerNode[],
   draft: PlannerPlaceActivityDraft,

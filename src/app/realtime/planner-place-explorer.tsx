@@ -1,3 +1,6 @@
+// 장소 탐색(places)과 일정 트리(planner)를 잇는 지점
+// places는 트리 구조를 모르고 planner는 목업 장소 형태를 모르므로 둘 사이 번역은 여기서만 함
+
 import { useCallback, useMemo } from "react";
 
 import {
@@ -33,7 +36,7 @@ function buildPlaceAddTargets(tree: PlannerTree): PlaceAddTarget[] {
   return tree.flattenedItems.flatMap((node) => toPlaceAddTarget(node) ?? []);
 }
 
-// 선택한 행에서 위로 올라가며 처음 만나는 날짜(또는 위시리스트)를 "지금 보고 있는 곳"으로 본다.
+// 선택한 행에서 위로 올라가며 처음 만나는 날짜(또는 위시리스트)를 "지금 보고 있는 곳"으로 봄
 function findCurrentTargetId(
   tree: PlannerTree,
   selectedItemId: PlannerNodePathId | null,
@@ -50,8 +53,6 @@ function findCurrentTargetId(
   return null;
 }
 
-// 장소 탐색(places)과 일정 트리(planner)를 잇는 지점이다.
-// places는 트리 구조를 모르고, planner는 목업 장소 형태를 모르므로 번역은 여기서만 한다.
 export function PlannerPlaceExplorer({ createPlaceActivity }: PlannerPlaceExplorerProps) {
   const tree = usePlannerViewStore((state) => state.tree);
   const selectedItemId = usePlannerViewStore((state) => state.selectedItemId);
@@ -73,7 +74,7 @@ export function PlannerPlaceExplorer({ createPlaceActivity }: PlannerPlaceExplor
         ratingCount: place.reviewCount,
         googlePlaceId: "",
       });
-      // 추가한 장소가 보이도록 부모 날짜를 펼치고 지도를 그 위치로 옮긴다.
+      // 추가한 장소가 보이도록 부모 날짜를 펼치고 지도를 그 위치로 옮김
       usePlannerViewStore.getState().activateItem(pathId);
     },
     [createPlaceActivity],

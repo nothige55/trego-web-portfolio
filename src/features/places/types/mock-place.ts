@@ -1,4 +1,4 @@
-// Explore 패널이 보여 주는 목업 장소 한 건의 표시용 필드 타입
+// Explore 패널이 보여 주는 목업 장소 타입과, 장소를 넣을 일정 위치 타입
 
 export interface MockPlace {
   readonly id: string;
@@ -17,7 +17,7 @@ export interface MockPlace {
   readonly tags: readonly string[];
 }
 
-// 장소를 넣을 수 있는 일정 위치다. places는 planner 트리를 모르므로 app이 이 형태로 번역해 준다.
+// 장소를 넣을 수 있는 일정 위치. places는 planner 트리를 모르므로 app이 이 형태로 번역해 줌
 export interface PlaceAddTarget {
   readonly id: string;
   readonly label: string;
