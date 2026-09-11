@@ -19,25 +19,12 @@ import type {
   FlattenedPlannerNode,
   PlannerNodePathId,
 } from "@/features/planner/types/planner-node";
+import {
+  getPlannerRowHighlight,
+  getPlannerRowHighlightClassName,
+  getPlannerSelectionState,
+} from "@/features/planner/utils/get-planner-row-highlight";
 import { getPlannerRowIndentation } from "@/features/planner/utils/get-planner-row-indentation";
-
-function hasSelectedAncestor(
-  node: FlattenedPlannerNode,
-  selectedIds: readonly PlannerNodePathId[],
-  entityMap: ReadonlyMap<PlannerNodePathId, FlattenedPlannerNode>,
-): boolean {
-  let parentPathId = node.parentPathId;
-
-  while (parentPathId) {
-    if (selectedIds.includes(parentPathId)) {
-      return true;
-    }
-
-    parentPathId = entityMap.get(parentPathId)?.parentPathId ?? null;
-  }
-
-  return false;
-}
 
 export function PlannerTreeItem({
   node,
@@ -99,20 +86,21 @@ export function PlannerTreeItem({
   });
   const hasChildren = (childrenMap.get(node.pathId) ?? []).length > 0;
   const isExpanded = expandedIds.has(node.pathId);
-  // Shift 선택 중에는 정규화된 작업 대상만 강하게 표시. anchor는 범위 계산 기준으로만 남김
-  const isSelected =
-    multiSelectedIds.length > 0
-      ? multiSelectedIds.includes(node.pathId)
-      : selectedItemId === node.pathId;
-  // 선택 이후 펼쳐진 자손도 실제 작업 대상에 포함된다는 의미를 연한 배경으로 이어서 보여 줌
-  const isSelectionContext =
-    !isSelected &&
-    (selectionRangeIds.includes(node.pathId) ||
-      hasSelectedAncestor(node, multiSelectedIds, entityMap));
-  // 선택 상태는 유지하되 drag overlay와 중복 강조되지 않도록 목록 배경만 숨김
-  const isSelectedHighlightVisible = isSelected && !suppressSelectionHighlight;
-  const isSelectionContextHighlightVisible = isSelectionContext && !suppressSelectionHighlight;
+  const selectionState = getPlannerSelectionState(
+    node,
+    { selectedItemId, multiSelectedIds, selectionRangeIds },
+    entityMap,
+  );
+  const isSelected = selectionState === "selected";
   const isMapHovered = hoveredItemId === node.pathId;
+  // 선택 상태는 유지하되 drag overlay와 중복 강조되지 않도록 목록 배경만 숨김
+  const highlight = getPlannerRowHighlight({
+    selectionState,
+    isMapHovered,
+    isSelectionHighlightSuppressed: suppressSelectionHighlight,
+  });
+  const labelHoverClassName =
+    highlight === "range" ? "hover:bg-brand/10" : highlight ? "" : "hover:bg-muted/70";
   // 별도의 20px 토글 칸을 항상 유지해 자식 유무와 관계없이 라벨 시작점을 맞춤
   const indentation = getPlannerRowIndentation(node.depth);
   const isEditingName = nameEditing.editingPathId === node.pathId;
@@ -134,7 +122,7 @@ export function PlannerTreeItem({
       role="treeitem"
       aria-expanded={hasChildren ? isExpanded : undefined}
       aria-selected={isSelected}
-      data-selection-state={isSelected ? "selected" : isSelectionContext ? "range" : undefined}
+      data-selection-state={selectionState ?? undefined}
       data-map-highlight={isMapHovered ? "hovered" : undefined}
       data-drop-state={isChildTarget ? "child" : isExpandingTarget ? "expanding" : undefined}
       className="list-none"
@@ -196,18 +184,12 @@ export function PlannerTreeItem({
           onBeginEditing={nameEditing.begin}
           trigger={
             <div
-              className={`group flex h-9 items-center border-l-2 transition-colors ${
+              className={`group flex h-9 items-center border-l-2 text-foreground transition-colors ${
                 isChildTarget
-                  ? "planner-child-drop-fill border-brand text-foreground"
+                  ? "planner-child-drop-fill border-brand"
                   : isExpandingTarget
-                    ? "border-brand/60 bg-brand/5 text-foreground"
-                    : isSelectedHighlightVisible
-                      ? "border-brand bg-brand/10 text-foreground"
-                      : isMapHovered
-                        ? "border-brand/70 bg-brand/10 text-foreground"
-                        : isSelectionContextHighlightVisible
-                          ? "border-transparent bg-brand/5 text-foreground hover:bg-brand/10"
-                          : "border-transparent text-foreground hover:bg-muted/70"
+                    ? "border-brand/60 bg-brand/5"
+                    : `${getPlannerRowHighlightClassName(highlight)} ${labelHoverClassName}`
               }`}
               style={{ paddingLeft: indentation }}
               onPointerEnter={() => setHoveredItem(node.pathId)}
@@ -298,7 +280,9 @@ export function PlannerTreeItem({
             editing={memoEditing}
             commands={commands}
             className={
-              isSelectedHighlightVisible ? "border-brand bg-brand/5" : "border-transparent"
+              highlight === "selected"
+                ? "border-brand bg-brand/5"
+                : getPlannerRowHighlightClassName(highlight === "range" ? highlight : null)
             }
           />
         ) : null}

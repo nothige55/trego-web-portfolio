@@ -491,6 +491,63 @@ describe("PlannerSchedulePanel", () => {
       "true",
     );
     expect(memo.closest("[class*='border-l-2']")).toHaveClass("bg-brand/5");
+    // 선택한 장소로 들어오는 구간은 앞 장소가 선택되지 않았으므로 칠하지 않음
+    expect(screen.getByTestId("planner-route-day-one-aewol")).toHaveClass(
+      "border-transparent",
+      "bg-card",
+    );
+  });
+
+  it("carries the multi-selection band through memos and route segments", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(<PlannerWorkspace isNodeMoveEnabled onMoveNode={vi.fn()} projectId="demo" />);
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일" }));
+    await user.keyboard("{Shift>}");
+    await user.click(within(tree).getByRole("button", { name: "8월 13일" }));
+    await user.keyboard("{/Shift}");
+
+    expect(within(tree).getByText("애월 해안도로").closest("[role=treeitem]")).toHaveAttribute(
+      "data-selection-state",
+      "range",
+    );
+    expect(
+      within(tree).getByText("카페에서 잠시 쉬기").closest("[class*='border-l-2']"),
+    ).toHaveClass("bg-brand/5");
+    for (const pathId of ["day-one-iho", "day-one-aewol", "day-one-hyeopjae"]) {
+      expect(screen.getByTestId(`planner-route-${pathId}`)).toHaveClass("bg-brand/5");
+    }
+  });
+
+  it("links route segments only between places selected together", async () => {
+    const user = userEvent.setup();
+    usePlannerViewStore.getState().load(demoPlannerProject.nodes);
+    usePlannerViewStore.getState().setProjectDetails(demoPlannerProject);
+    render(<PlannerWorkspace isNodeMoveEnabled onMoveNode={vi.fn()} projectId="demo" />);
+    const tree = await screen.findByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+    await user.click(within(tree).getByText("제주국제공항"));
+    await user.keyboard("{Shift>}");
+    await user.click(within(tree).getByText("애월 해안도로"));
+    await user.keyboard("{/Shift}");
+
+    expect(screen.getByTestId("planner-route-day-one-iho")).toHaveClass(
+      "border-brand",
+      "bg-brand/10",
+    );
+    expect(screen.getByTestId("planner-route-day-one-aewol")).toHaveClass(
+      "border-brand",
+      "bg-brand/10",
+    );
+    // 애월에서 협재로 가는 구간은 협재가 선택 밖이라 띠가 여기서 끝남
+    expect(screen.getByTestId("planner-route-day-one-hyeopjae")).toHaveClass("bg-card");
   });
 
   it("keeps Activity names read-only and edits only their memo", async () => {
