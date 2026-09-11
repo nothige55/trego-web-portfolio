@@ -12,11 +12,25 @@ import { usePlannerMapStore } from "@/features/planner/stores/planner-map-store"
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { ApiClient } from "@/lib/api-client";
 
+// status는 "화면에 보여 줄 일정이 store에 있는가"를, error는 마지막 조회의 실패 원인을 나타낸다.
+// - loading: 이 프로젝트의 일정을 아직 받지 못했다.
+// - error: 첫 조회가 실패해 보여 줄 일정이 없다.
+// - ready: 일정이 적재되어 있다. 재조회가 실패해도 ready를 유지하고 error만 채운다.
 export type ProjectDataState = {
   readonly error: Error | null;
   readonly projectId: string;
   readonly status: "error" | "loading" | "ready";
 };
+
+type ProjectDataLoadMode = "initial" | "refresh";
+
+function createLoadingState(projectId: string): ProjectDataState {
+  return { error: null, projectId, status: "loading" };
+}
+
+function isReadyFor(state: ProjectDataState, projectId: string): boolean {
+  return state.projectId === projectId && state.status === "ready";
+}
 
 export type ProjectDataLoader = {
   readonly appendChatMessage: (message: ChatMessage) => void;
@@ -43,11 +57,9 @@ export function useProjectDataLoader({
   const [chatHistoryStatus, setChatHistoryStatus] = useState<"error" | "loading" | "ready">(
     "loading",
   );
-  const [projectDataState, setProjectDataState] = useState<ProjectDataState>({
-    error: null,
-    projectId,
-    status: "loading",
-  });
+  const [projectDataState, setProjectDataState] = useState<ProjectDataState>(() =>
+    createLoadingState(projectId),
+  );
   const activeProjectIdRef = useRef<string | null>(projectId);
   const projectRequestIdRef = useRef(0);
   const projectDataRequestRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null);
@@ -91,47 +103,69 @@ export function useProjectDataLoader({
     return promise;
   }, [projectId, restClient]);
 
-  const loadProjectData = useCallback((): Promise<void> => {
-    const pendingRequest = projectDataRequestRef.current;
+  // 재조회(refresh)는 이미 떠 있는 일정을 그대로 두고, 응답이 오면 노드만 교체한다.
+  // loading으로 되돌리면 호출부가 fallback 화면으로 바꾸면서 PlannerWorkspace가 unmount되어
+  // 트리 스크롤 위치와 지도 인스턴스를 잃는다. initial은 store를 비운 직후라 항상 loading부터 시작한다.
+  const loadProjectData = useCallback(
+    (mode: ProjectDataLoadMode): Promise<void> => {
+      const pendingRequest = projectDataRequestRef.current;
 
-    if (pendingRequest?.projectId === projectId) {
-      return pendingRequest.promise;
-    }
+      if (pendingRequest?.projectId === projectId) {
+        return pendingRequest.promise;
+      }
 
-    const requestId = ++projectRequestIdRef.current;
-    setProjectDataState({ error: null, projectId, status: "loading" });
-    const promise = Promise.all([
-      getProjectDetails(projectId, restClient),
-      getProjectNodes(projectId, restClient),
-    ])
-      .then(([projectDetails, nodes]) => {
-        if (activeProjectIdRef.current !== projectId || projectRequestIdRef.current !== requestId) {
-          return;
-        }
+      const requestId = ++projectRequestIdRef.current;
+      setProjectDataState((current) =>
+        mode === "refresh" && isReadyFor(current, projectId)
+          ? current
+          : createLoadingState(projectId),
+      );
+      const promise = Promise.all([
+        getProjectDetails(projectId, restClient),
+        getProjectNodes(projectId, restClient),
+      ])
+        .then(([projectDetails, nodes]) => {
+          if (
+            activeProjectIdRef.current !== projectId ||
+            projectRequestIdRef.current !== requestId
+          ) {
+            return;
+          }
 
-        const plannerStore = usePlannerViewStore.getState();
-        plannerStore.setProjectDetails(projectDetails);
-        plannerStore.replaceNodes(nodes);
-        setProjectDataState({ error: null, projectId, status: "ready" });
-      })
-      .catch((error: unknown) => {
-        const projectError = error instanceof Error ? error : new Error(String(error));
+          const plannerStore = usePlannerViewStore.getState();
+          plannerStore.setProjectDetails(projectDetails);
+          plannerStore.replaceNodes(nodes);
+          setProjectDataState({ error: null, projectId, status: "ready" });
+        })
+        .catch((error: unknown) => {
+          const projectError = error instanceof Error ? error : new Error(String(error));
 
-        if (activeProjectIdRef.current === projectId && projectRequestIdRef.current === requestId) {
-          setProjectDataState({ error: projectError, projectId, status: "error" });
-        }
+          if (
+            activeProjectIdRef.current === projectId &&
+            projectRequestIdRef.current === requestId
+          ) {
+            // 보여 줄 일정이 이미 있으면 화면을 유지하고 원인만 기록한다.
+            // 사용자에게는 호출부가 받는 rejection(featureError·실시간 연결 배너)으로 드러난다.
+            setProjectDataState((current) =>
+              isReadyFor(current, projectId)
+                ? { ...current, error: projectError }
+                : { error: projectError, projectId, status: "error" },
+            );
+          }
 
-        throw projectError;
-      })
-      .finally(() => {
-        if (projectDataRequestRef.current?.promise === promise) {
-          projectDataRequestRef.current = null;
-        }
-      });
+          throw projectError;
+        })
+        .finally(() => {
+          if (projectDataRequestRef.current?.promise === promise) {
+            projectDataRequestRef.current = null;
+          }
+        });
 
-    projectDataRequestRef.current = { projectId, promise };
-    return promise;
-  }, [projectId, restClient]);
+      projectDataRequestRef.current = { projectId, promise };
+      return promise;
+    },
+    [projectId, restClient],
+  );
 
   useEffect(() => {
     activeProjectIdRef.current = projectId;
@@ -139,7 +173,7 @@ export function useProjectDataLoader({
     usePlannerViewStore.getState().reset();
     usePlannerMapStore.getState().reset();
     usePlannerHistoryStore.getState().clear();
-    void loadProjectData().catch(() => undefined);
+    void loadProjectData("initial").catch(() => undefined);
     void loadChatHistory().catch(() => undefined);
 
     return () => {
@@ -156,7 +190,7 @@ export function useProjectDataLoader({
   }, [loadChatHistory, loadProjectData, projectId]);
 
   const reload = useCallback(async (): Promise<void> => {
-    await Promise.all([loadProjectData(), loadChatHistory()]);
+    await Promise.all([loadProjectData("refresh"), loadChatHistory()]);
   }, [loadChatHistory, loadProjectData]);
 
   const appendChatMessage = useCallback(
@@ -181,9 +215,7 @@ export function useProjectDataLoader({
     loadChatHistory,
     messages: messageState.projectId === projectId ? messageState.messages : [],
     projectDataState:
-      projectDataState.projectId === projectId
-        ? projectDataState
-        : { error: null, projectId, status: "loading" },
+      projectDataState.projectId === projectId ? projectDataState : createLoadingState(projectId),
     reload,
   };
 }

@@ -5,7 +5,7 @@ import { ProjectPlannerPage } from "@/app/realtime/project-planner-page";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
 import type { ApiClient } from "@/lib/api-client";
 import type { SignalRClient, SignalRConnectionStatus } from "@/lib/signalr-client";
-import { fireEvent, render, screen, userEvent, waitFor } from "@/testing/test-utils";
+import { act, fireEvent, render, screen, userEvent, waitFor } from "@/testing/test-utils";
 
 vi.mock("@/features/planner/components/planner-map", () => ({
   PlannerMap: () => <section aria-label="지도 영역" />,
@@ -48,11 +48,11 @@ function createFakeSignalRClient() {
     eventHandlers.get(eventName)?.forEach((handler) => handler(...args));
   }
 
-  return { client, emit, invoke };
+  return { client, emit, invoke, setStatus };
 }
 
 function createRestClient() {
-  const get = vi.fn(async (url: string) => {
+  const get = vi.fn(async (url: string): Promise<unknown> => {
     if (url.endsWith("/nodes")) {
       return [
         {
@@ -221,6 +221,108 @@ describe("ProjectPlannerPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Live project" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "제주도 7일 여행" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the planner workspace mounted while resyncing after a reconnect", async () => {
+    const signalR = createFakeSignalRClient();
+    const rest = createRestClient();
+    render(
+      <ProjectPlannerPage
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "11111111-1111-1111-1111-111111111111",
+          name: "One",
+        }}
+        projectId="33333333-3333-3333-3333-333333333333"
+        restClient={rest.client}
+      />,
+    );
+    await screen.findByRole("heading", { name: "Live project" });
+    const workspace = screen.getByRole("main", { name: "여행 일정 플래너" });
+
+    const respondWithDefaultData = rest.get.getMockImplementation()!;
+    let resolveProjectDetails!: (details: unknown) => void;
+    rest.get.mockImplementation((url: string) =>
+      url.endsWith("/projects/33333333-3333-3333-3333-333333333333")
+        ? new Promise((resolve) => {
+            resolveProjectDetails = resolve;
+          })
+        : respondWithDefaultData(url),
+    );
+    act(() => {
+      signalR.setStatus("reconnecting");
+      signalR.setStatus("connected");
+    });
+
+    expect(await screen.findByText("실시간 연결 중입니다.")).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "여행 일정 플래너" })).toBe(workspace);
+    expect(screen.queryByText("여행 일정 데이터를 불러오는 중입니다.")).not.toBeInTheDocument();
+
+    act(() => {
+      resolveProjectDetails({
+        publicId: "33333333-3333-3333-3333-333333333333",
+        title: "Resynced project",
+        startDate: "2026-08-01T00:00:00Z",
+        endDate: "2026-08-03T00:00:00Z",
+        isPublic: false,
+      });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Resynced project" })).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "여행 일정 플래너" })).toBe(workspace);
+    await waitFor(() =>
+      expect(screen.queryByText("실시간 연결 중입니다.")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("keeps stale planner data and shows the banner when a reconnect resync fails", async () => {
+    const signalR = createFakeSignalRClient();
+    const rest = createRestClient();
+    render(
+      <ProjectPlannerPage
+        clientFactory={() => signalR.client}
+        identity={{
+          accessToken: "token",
+          email: "one@example.com",
+          id: "11111111-1111-1111-1111-111111111111",
+          name: "One",
+        }}
+        projectId="33333333-3333-3333-3333-333333333333"
+        restClient={rest.client}
+      />,
+    );
+    await screen.findByRole("heading", { name: "Live project" });
+    const workspace = screen.getByRole("main", { name: "여행 일정 플래너" });
+
+    const respondWithDefaultData = rest.get.getMockImplementation()!;
+    rest.get.mockImplementation((url: string) =>
+      url.endsWith("/nodes")
+        ? Promise.reject(new Error("resync failed"))
+        : respondWithDefaultData(url),
+    );
+    act(() => {
+      signalR.setStatus("reconnecting");
+      signalR.setStatus("connected");
+    });
+
+    expect(await screen.findByText("실시간 동기화에 실패했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("resync failed")).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "여행 일정 플래너" })).toBe(workspace);
+    expect(screen.getByRole("heading", { name: "Live project" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "여행 일정을 불러오지 못했습니다." }),
+    ).not.toBeInTheDocument();
+
+    rest.get.mockImplementation(respondWithDefaultData);
+    await userEvent.setup().click(screen.getByRole("button", { name: "다시 연결" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("실시간 동기화에 실패했습니다.")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText("resync failed")).not.toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "여행 일정 플래너" })).toBe(workspace);
   });
 
   it("shows the project REST error without falling back to fixture data", async () => {
