@@ -12,6 +12,11 @@ export const router = createBrowserRouter([
     errorElement: <RouteError />,
   },
   {
+    path: "/demo",
+    lazy: async () => ({ Component: (await import("@/app/routes/demo-route")).DemoRoute }),
+    errorElement: <RouteError />,
+  },
+  {
     path: "/planner/:projectId/:projectTitle?",
     element: <PlannerRoute />,
     errorElement: <RouteError />,
