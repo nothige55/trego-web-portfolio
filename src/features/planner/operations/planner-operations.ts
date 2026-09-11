@@ -19,6 +19,16 @@ export interface PlannerCreateNodeDraft {
   readonly parentPathId: PlannerNodePathId;
 }
 
+export interface PlannerPlaceActivityDraft {
+  readonly parentPathId: PlannerNodePathId;
+  readonly name: string;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly rating: number;
+  readonly ratingCount: number;
+  readonly googlePlaceId: string;
+}
+
 export type PlannerCreateNodeInput =
   | Readonly<{ kind: "day"; input: CreateDayInput }>
   | Readonly<{ kind: "wish-folder"; input: CreateFolderInput }>;
@@ -68,6 +78,29 @@ function createActivityInput(
     rating: 0,
     ratingCount: 0,
     googlePlaceId: "",
+  };
+}
+
+// 장소 검색 결과처럼 좌표를 가진 단일 장소를 대상 부모의 마지막에 붙임
+export function buildPlaceActivityInput(
+  nodes: readonly PlannerNode[],
+  draft: PlannerPlaceActivityDraft,
+): CreateActivityInput {
+  const target = nodes.find((node) => node.pathId === draft.parentPathId);
+  const canContainPlace =
+    target?.kind === "day" || (target?.kind === "folder" && target.folderType === "wish");
+
+  if (!canContainPlace) {
+    throw new Error("장소를 넣을 날짜를 찾을 수 없습니다.");
+  }
+
+  return {
+    ...createActivityInput(nodes, draft.parentPathId, draft.name, "single"),
+    latitude: draft.latitude,
+    longitude: draft.longitude,
+    rating: draft.rating,
+    ratingCount: draft.ratingCount,
+    googlePlaceId: draft.googlePlaceId,
   };
 }
 

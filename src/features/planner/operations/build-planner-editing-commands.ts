@@ -12,6 +12,7 @@ import type { PlannerOperationCommand } from "@/features/planner/operations/plan
 import {
   buildCreateNodeInput,
   buildGroupPlan,
+  buildPlaceActivityInput,
   normalizeOperationPathIds,
 } from "@/features/planner/operations/planner-operations";
 import { usePlannerViewStore } from "@/features/planner/stores/planner-view-store";
@@ -61,6 +62,15 @@ export function createPlannerEditingCommands({
         [createOperation],
         [{ type: "delete-node", input: { pathId: created.input.pathId } }],
       );
+    },
+    createPlaceActivity: async (draft) => {
+      const input = buildPlaceActivityInput(usePlannerViewStore.getState().nodes, draft);
+      await runRecordedOperation(
+        "장소 추가",
+        [{ type: "create-activity", input }],
+        [{ type: "delete-node", input: { pathId: input.pathId } }],
+      );
+      return input.pathId;
     },
     deleteNode: async (input) => {
       const state = usePlannerViewStore.getState();

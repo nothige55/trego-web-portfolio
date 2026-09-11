@@ -4,6 +4,7 @@ import { buildDeleteHistoryOperations } from "@/features/planner/operations/plan
 import {
   buildCreateNodeInput,
   buildGroupPlan,
+  buildPlaceActivityInput,
   getAppendPosition,
   normalizeOperationPathIds,
 } from "@/features/planner/operations/planner-operations";
@@ -78,6 +79,45 @@ describe("planner operations", () => {
       },
     });
     expect(result.input.position).toBeCloseTo(0.2);
+  });
+
+  it("appends a searched place with its coordinates as the last activity of a day", () => {
+    const input = buildPlaceActivityInput(nodes, {
+      parentPathId: "day",
+      name: "성산일출봉",
+      latitude: 33.4581,
+      longitude: 126.9425,
+      rating: 4.7,
+      ratingCount: 18432,
+      googlePlaceId: "",
+    });
+
+    expect(input).toMatchObject({
+      id: "11111111-1111-4111-8111-111111111111",
+      pathId: "22222222-2222-4222-8222-222222222222",
+      name: "성산일출봉",
+      parentPathId: "day",
+      activityType: "single",
+      latitude: 33.4581,
+      longitude: 126.9425,
+      rating: 4.7,
+      ratingCount: 18432,
+    });
+    expect(input.position).toBeCloseTo(0.3);
+  });
+
+  it("rejects adding a place under a node that cannot hold activities", () => {
+    expect(() =>
+      buildPlaceActivityInput(nodes, {
+        parentPathId: "root",
+        name: "성산일출봉",
+        latitude: 33.4581,
+        longitude: 126.9425,
+        rating: 0,
+        ratingCount: 0,
+        googlePlaceId: "",
+      }),
+    ).toThrow("장소를 넣을 날짜를 찾을 수 없습니다.");
   });
 
   it("promotes selected ancestors so descendants are not operated twice", () => {
