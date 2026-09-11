@@ -25,15 +25,18 @@ import {
 } from "@/components/ui/popover";
 import { MOCK_PLACES } from "@/features/places/data/mock-places";
 import type { MockPlace, PlaceAddTarget } from "@/features/places/types/mock-place";
+import { cn } from "@/lib/utils";
 
 function PlaceDetail({
   place,
   targets,
+  currentTargetId,
   onAddPlace,
   onBack,
 }: {
   readonly place: MockPlace;
   readonly targets: readonly PlaceAddTarget[];
+  readonly currentTargetId: string | null;
   readonly onAddPlace?: PlaceAddHandler;
   readonly onBack: () => void;
 }) {
@@ -117,7 +120,12 @@ function PlaceDetail({
         </span>
       </div>
 
-      <PlaceAddControl place={place} targets={targets} onAddPlace={onAddPlace} />
+      <PlaceAddControl
+        place={place}
+        targets={targets}
+        currentTargetId={currentTargetId}
+        onAddPlace={onAddPlace}
+      />
     </article>
   );
 }
@@ -130,18 +138,51 @@ type PlaceAddStatus =
   | Readonly<{ kind: "added"; label: string }>
   | Readonly<{ kind: "error"; message: string }>;
 
+// 날짜 이름은 짧아 3열에 들어가지만 위시리스트 이름은 길어서 2열로 둔다.
 const TARGET_GROUPS = [
-  { group: "day", label: "날짜" },
-  { group: "wish", label: "가보고 싶은 곳" },
+  { group: "day", label: "날짜", columns: "grid-cols-3" },
+  { group: "wish", label: "가보고 싶은 곳", columns: "grid-cols-2" },
 ] as const;
+
+function PlaceAddTargetChip({
+  target,
+  isCurrent,
+  onSelect,
+}: {
+  readonly target: PlaceAddTarget;
+  readonly isCurrent: boolean;
+  readonly onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={target.label}
+      aria-current={isCurrent ? "true" : undefined}
+      className={cn(
+        "flex h-8 w-full min-w-0 items-center gap-1.5 rounded-md border px-2 text-xs hover:border-brand/40 hover:bg-brand/5 focus-visible:outline-2 focus-visible:outline-brand",
+        isCurrent && "border-brand bg-brand/10 font-medium text-brand",
+      )}
+      onClick={onSelect}
+    >
+      <span
+        aria-hidden="true"
+        className="size-2 shrink-0 rounded-full bg-brand"
+        style={target.color ? { backgroundColor: target.color } : undefined}
+      />
+      <span className="truncate">{target.label}</span>
+    </button>
+  );
+}
 
 function PlaceAddControl({
   place,
   targets,
+  currentTargetId,
   onAddPlace,
 }: {
   readonly place: MockPlace;
   readonly targets: readonly PlaceAddTarget[];
+  readonly currentTargetId: string | null;
   readonly onAddPlace?: PlaceAddHandler;
 }) {
   const [isOpen, setOpen] = useState(false);
@@ -178,32 +219,30 @@ function PlaceAddControl({
             <PopoverTitle>어느 일정에 넣을까요?</PopoverTitle>
           </PopoverHeader>
           {targets.length > 0 ? (
-            TARGET_GROUPS.map(({ group, label }) => {
-              const groupTargets = targets.filter((target) => target.group === group);
-              return groupTargets.length > 0 ? (
-                <div key={group} role="group" aria-label={label}>
-                  <p className="px-1 pb-1 text-[11px] font-medium text-muted-foreground">{label}</p>
-                  <ul className="scrollbar-hide max-h-48 space-y-0.5 overflow-y-auto">
-                    {groupTargets.map((target) => (
-                      <li key={target.id}>
-                        <button
-                          type="button"
-                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
-                          onClick={() => void addTo(target)}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="size-2 shrink-0 rounded-full bg-brand"
-                            style={target.color ? { backgroundColor: target.color } : undefined}
+            // 날짜가 많아도 팝오버가 길어지지 않도록 칩을 격자로 놓고, 그래도 넘치면 안에서 스크롤한다.
+            <div className="scrollbar-hide max-h-72 space-y-3 overflow-y-auto">
+              {TARGET_GROUPS.map(({ columns, group, label }) => {
+                const groupTargets = targets.filter((target) => target.group === group);
+                return groupTargets.length > 0 ? (
+                  <div key={group} role="group" aria-label={label}>
+                    <p className="px-1 pb-1.5 text-[11px] font-medium text-muted-foreground">
+                      {label}
+                    </p>
+                    <ul className={cn("grid gap-1", columns)}>
+                      {groupTargets.map((target) => (
+                        <li key={target.id} className="min-w-0">
+                          <PlaceAddTargetChip
+                            target={target}
+                            isCurrent={target.id === currentTargetId}
+                            onSelect={() => void addTo(target)}
                           />
-                          <span className="truncate">{target.label}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null;
-            })
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null;
+              })}
+            </div>
           ) : (
             <p className="px-1 pb-1 text-xs leading-5 text-muted-foreground">
               장소를 넣을 날짜가 없습니다. 일정에서 날짜를 먼저 추가해 주세요.
@@ -237,10 +276,16 @@ function PlaceAddControl({
 
 type MockPlaceExplorerProps = {
   readonly addTargets?: readonly PlaceAddTarget[];
+  // 일정에서 지금 보고 있는 날짜. 같은 날에 연달아 넣을 때 바로 찾도록 강조한다.
+  readonly currentTargetId?: string | null;
   readonly onAddPlace?: PlaceAddHandler;
 };
 
-export function MockPlaceExplorer({ addTargets = [], onAddPlace }: MockPlaceExplorerProps) {
+export function MockPlaceExplorer({
+  addTargets = [],
+  currentTargetId = null,
+  onAddPlace,
+}: MockPlaceExplorerProps) {
   const [query, setQuery] = useState("");
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const selectedPlace = MOCK_PLACES.find((place) => place.id === selectedPlaceId);
@@ -264,6 +309,7 @@ export function MockPlaceExplorer({ addTargets = [], onAddPlace }: MockPlaceExpl
         key={selectedPlace.id}
         place={selectedPlace}
         targets={addTargets}
+        currentTargetId={currentTargetId}
         onAddPlace={onAddPlace}
         onBack={() => setSelectedPlaceId(null)}
       />

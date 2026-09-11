@@ -230,6 +230,14 @@ describe("ProjectPlannerPage", () => {
     const addedRow = within(tree).getByText("성산일출봉").closest("[role=treeitem]");
     expect(addedRow).toHaveAttribute("aria-selected", "true");
 
+    await user.click(screen.getByRole("button", { name: "일정에 추가" }));
+    const nextDayTargets = await screen.findByRole("group", { name: "날짜" });
+    expect(within(nextDayTargets).getByRole("button", { name: "8월 1일" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    await user.keyboard("{Escape}");
+
     const created = signalR.invoke.mock.calls.find(([method]) => method === "CreateActivity")!;
     await user.click(screen.getByRole("button", { name: "실행 취소" }));
     expect(signalR.invoke).toHaveBeenCalledWith("DeleteNode", {

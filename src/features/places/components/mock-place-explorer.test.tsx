@@ -53,6 +53,20 @@ describe("MockPlaceExplorer", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("8월 13일에 추가했습니다.");
   });
 
+  it("marks the day currently viewed in the schedule among the targets", async () => {
+    const user = userEvent.setup();
+    render(<MockPlaceExplorer addTargets={targets} currentTargetId="day-2" onAddPlace={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /비자림/ }));
+    await user.click(screen.getByRole("button", { name: "일정에 추가" }));
+
+    expect(await screen.findByRole("button", { name: "8월 13일" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "8월 12일" })).not.toHaveAttribute("aria-current");
+  });
+
   it("shows the failure message when adding the place fails", async () => {
     const user = userEvent.setup();
     const onAddPlace = vi.fn().mockRejectedValue(new Error("일정 추가에 실패했습니다."));
