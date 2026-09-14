@@ -174,7 +174,7 @@ export function PlannerTreeItem({
           <div
             aria-hidden="true"
             data-testid="planner-root-boundary-label"
-            className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-8 items-center bg-card pr-2 pl-[22px]"
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex h-8 items-center bg-card pr-2 pl-[22px]"
           >
             <PlannerNodeLabel
               node={boundaryAncestor}
