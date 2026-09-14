@@ -264,15 +264,12 @@ export function PlannerSchedulePanel({
         : null,
     [dragLayout, dragNodeHeights, rowAdornments, sortableItems],
   );
+  // 다음 최상위 구간이 breadcrumb 아랫변에 닿으면 그 행은 조상이 없으므로 breadcrumb도 비워짐
+  // 그 자리는 앞 행에 붙는 이전 구간 라벨(boundaryAncestor)이 이어받음
   const breadcrumbAncestors = useMemo(
     () => getPlannerBreadcrumbAncestors(topItemId, rootPathId, tree.entityMap),
     [rootPathId, topItemId, tree.entityMap],
   );
-  const topItemIndex = topItemId
-    ? renderedItems.findIndex((item) => item.pathId === topItemId)
-    : -1;
-  const isNextRootChild = topItemIndex >= 0 && renderedItems[topItemIndex + 1]?.depth === 1;
-  const visibleBreadcrumbAncestors = isNextRootChild ? [] : breadcrumbAncestors;
 
   if (!projectDetails) {
     return (
@@ -306,7 +303,7 @@ export function PlannerSchedulePanel({
           onScroll={updateTopItem}
         >
           <PlannerBreadcrumb
-            ancestors={visibleBreadcrumbAncestors}
+            ancestors={breadcrumbAncestors}
             dayNumberByPathId={dayNumberByPathId}
             entityMap={tree.entityMap}
           />

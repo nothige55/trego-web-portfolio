@@ -13,6 +13,8 @@ type PlannerBreadcrumbProps = {
   readonly entityMap: ReadonlyMap<PlannerNodePathId, FlattenedPlannerNode>;
 };
 
+// 일정 도구 막대(h-8) 바로 아래에 붙으므로 sticky top도 32px
+export const PLANNER_BREADCRUMB_TOP = 32;
 export const PLANNER_BREADCRUMB_HEIGHT = 32;
 
 export function PlannerBreadcrumb({

@@ -232,9 +232,9 @@ describe("PlannerWorkspace", () => {
       tree,
       scrollArea,
       new Map([
-        ["가보고 싶은 곳", -20],
-        ["제주도", 20],
-        ["8월 12일", 60],
+        ["가보고 싶은 곳", 4],
+        ["제주도", 40],
+        ["8월 12일", 76],
       ]),
     );
 
@@ -242,6 +242,40 @@ describe("PlannerWorkspace", () => {
 
     expect(screen.queryByRole("navigation", { name: "현재 일정 경로" })).not.toBeInTheDocument();
     expect(within(tree).getAllByText("제주도")).toHaveLength(1);
+  });
+
+  it("adds a day to the breadcrumb as soon as its label slides fully under the breadcrumb", async () => {
+    const user = await renderPlanner();
+    const tree = screen.getByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+    await user.click(within(tree).getByRole("button", { name: "8월 12일 펼치기" }));
+
+    const scrollArea = screen.getByTestId("planner-schedule-scroll-area");
+    const tops: [string, number][] = [
+      ["가보고 싶은 곳", -300],
+      ["제주도", -250],
+      ["8월 12일", 40],
+      ["제주국제공항", 76],
+    ];
+    mockPlannerRowTops(tree, scrollArea, new Map(tops));
+    fireEvent.scroll(scrollArea);
+
+    // 날짜 행이 아직 breadcrumb 아래로 들어가는 중이면 그 날짜는 현재 행이라 경로에 없음
+    let breadcrumb = screen.getByRole("navigation", { name: "현재 일정 경로" });
+    expect(within(breadcrumb).getByText("제주도")).toBeInTheDocument();
+    expect(within(breadcrumb).queryByText("8월 12일")).not.toBeInTheDocument();
+
+    // 도구 막대(32px)와 breadcrumb(32px) 아래로 완전히 가려진 순간, 다음 행이 breadcrumb 아랫변에 닿음
+    mockPlannerRowTops(
+      tree,
+      scrollArea,
+      new Map([...tops.slice(0, 2), ["8월 12일", 28], ["제주국제공항", 64]]),
+    );
+    fireEvent.scroll(scrollArea);
+
+    breadcrumb = screen.getByRole("navigation", { name: "현재 일정 경로" });
+    expect(within(breadcrumb).getByText("8월 12일")).toBeInTheDocument();
   });
 
   it("ends the previous breadcrumb at the next root branch boundary", async () => {
@@ -264,6 +298,34 @@ describe("PlannerWorkspace", () => {
       ]),
     );
 
+    fireEvent.scroll(scrollArea);
+
+    expect(screen.queryByRole("navigation", { name: "현재 일정 경로" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("planner-root-boundary-label")).toHaveTextContent("제주도");
+  });
+
+  it("keeps the breadcrumb until the next root branch reaches the breadcrumb bottom", async () => {
+    const user = await renderPlanner();
+    const tree = screen.getByRole("tree", { name: "여행 일정" });
+
+    await user.click(within(tree).getByRole("button", { name: "제주도 펼치기" }));
+
+    const scrollArea = screen.getByTestId("planner-schedule-scroll-area");
+    const tops: [string, number][] = [
+      ["가보고 싶은 곳", -300],
+      ["제주도", -250],
+      ["8월 12일", -180],
+      ["8월 13일", -80],
+    ];
+    // 마지막 날짜가 breadcrumb 아래로 들어가는 중에는 서귀포가 아직 아래에 있으므로 경로를 유지함
+    mockPlannerRowTops(tree, scrollArea, new Map([...tops, ["8월 14일", 20], ["서귀포", 70]]));
+    fireEvent.scroll(scrollArea);
+
+    expect(screen.getByRole("navigation", { name: "현재 일정 경로" })).toHaveTextContent("제주도");
+    expect(screen.queryByTestId("planner-root-boundary-label")).not.toBeInTheDocument();
+
+    // 서귀포가 breadcrumb 아랫변에 닿으면 마지막 행이 이전 구간 라벨을 이어받음
+    mockPlannerRowTops(tree, scrollArea, new Map([...tops, ["8월 14일", 28], ["서귀포", 64]]));
     fireEvent.scroll(scrollArea);
 
     expect(screen.queryByRole("navigation", { name: "현재 일정 경로" })).not.toBeInTheDocument();

@@ -11,7 +11,8 @@ import type { PlannerDragProjection } from "@/features/planner/utils/build-plann
 import { calculatePlannerDistanceKm } from "@/features/planner/utils/calculate-planner-distance";
 
 export type PlannerRowAdornments = {
-  // 스크롤 경계에서 다음 최상위 노드로 넘어가기 직전에 겹쳐 보여 줄 조상 행
+  // 다음 최상위 노드가 breadcrumb 아랫변까지 올라왔을 때 이 행 아래쪽에 붙일 이전 구간의 최상위 라벨
+  // 다음 구간에 밀려 함께 올라가므로, 행 높이(메모 유무)와 상관없이 breadcrumb 자리에서 이어받음
   readonly boundaryAncestor?: FlattenedPlannerNode;
   // 같은 Day 안에서 바로 앞 Activity. 이동 수단·거리 안내를 그릴 때만 씀
   readonly previousActivity?: PlannerActivityNode;
@@ -109,7 +110,7 @@ export function getPlannerRowAdornments({
   const boundaryAncestor =
     !isDragging &&
     nextNode?.depth === 1 &&
-    node.pathId === topItemId &&
+    nextNode.pathId === topItemId &&
     node.depth !== 1 &&
     !isAloneAndRootChild
       ? getTopAncestor(node, tree, rootPathId)

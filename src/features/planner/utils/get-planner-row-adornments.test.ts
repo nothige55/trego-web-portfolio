@@ -74,7 +74,20 @@ describe("getPlannerRowAdornments", () => {
     expect(previousActivity).toBeUndefined();
   });
 
-  it("shows the top ancestor while the last row of a branch scrolls past", () => {
+  it("shows the top ancestor on the last row once the next root branch reaches the breadcrumb", () => {
+    const { boundaryAncestor } = getPlannerRowAdornments({
+      node: nodeOf("day-three-dongmun"),
+      nextNode: nodeOf("region-seogwipo"),
+      tree,
+      rootPathId: "root",
+      topItemId: "region-seogwipo",
+      isDragging: false,
+    });
+
+    expect(boundaryAncestor?.pathId).toBe("region-jeju");
+  });
+
+  it("waits while the last row itself is still sliding under the breadcrumb", () => {
     const { boundaryAncestor } = getPlannerRowAdornments({
       node: nodeOf("day-three-dongmun"),
       nextNode: nodeOf("region-seogwipo"),
@@ -84,7 +97,7 @@ describe("getPlannerRowAdornments", () => {
       isDragging: false,
     });
 
-    expect(boundaryAncestor?.pathId).toBe("region-jeju");
+    expect(boundaryAncestor).toBeUndefined();
   });
 
   it("hides the boundary label while a node is being dragged", () => {
@@ -93,7 +106,7 @@ describe("getPlannerRowAdornments", () => {
       nextNode: nodeOf("region-seogwipo"),
       tree,
       rootPathId: "root",
-      topItemId: "day-three-dongmun",
+      topItemId: "region-seogwipo",
       isDragging: true,
     });
 
