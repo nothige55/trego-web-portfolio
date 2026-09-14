@@ -24,7 +24,8 @@ import type {
 } from "@/features/planner/types/planner-node";
 import type { PlannerDragDestination } from "@/features/planner/utils/build-planner-drag-projection";
 
-const EMPTY_CHILD_DROP_DELAY = 800;
+// 빈 컨테이너 채움 애니메이션(1초, index.css)이 다 찬 뒤에야 자식 드롭을 받음
+const EMPTY_CHILD_DROP_DELAY = 1_000;
 const COLLAPSED_EXPAND_DELAY = 1_000;
 const EXPANDED_DROP_STABILITY_THRESHOLD = 7.5;
 
@@ -241,7 +242,7 @@ export function usePlannerDragAndDrop({
       }
 
       // 기존 Planner의 fill cue처럼 빈 컨테이너 진입 즉시 시각 상태를 켜고,
-      // 실제 child drop 승인은 800ms 뒤에만 허용
+      // 실제 child drop 승인은 채움이 다 찬 1초 뒤에만 허용
       setChildTargetPathId(overPathId);
       hoverTimerRef.current = setTimeout(() => {
         readyChildTargetPathIdRef.current = overPathId;

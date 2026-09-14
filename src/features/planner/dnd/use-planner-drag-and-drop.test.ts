@@ -134,7 +134,7 @@ describe("usePlannerDragAndDrop", () => {
 
     act(() => {
       result.current.handleDragCancel();
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(1_000);
     });
 
     expect(result.current.activePathId).toBeNull();
@@ -143,7 +143,7 @@ describe("usePlannerDragAndDrop", () => {
     expect(expandNode).not.toHaveBeenCalled();
   });
 
-  it("arms an empty child target after 800ms and applies the calculated destination", () => {
+  it("arms an empty child target after the 1s fill and applies the calculated destination", () => {
     vi.useFakeTimers();
     const { tree, visibleItems } = createFixture();
     const expandNode = vi.fn();
@@ -169,7 +169,7 @@ describe("usePlannerDragAndDrop", () => {
     expect(result.current.childTargetPathId).toBe("wish");
 
     act(() => {
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(1_000);
     });
 
     act(() => {
@@ -308,7 +308,7 @@ describe("usePlannerDragAndDrop", () => {
     });
     act(() => {
       result.current.handleDragMove(dragEvent("wish", { activeTop: 120 }));
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(1_000);
     });
 
     expect(result.current.childTargetPathId).toBeNull();
